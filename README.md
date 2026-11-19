@@ -1,7 +1,7 @@
 # agent-guard
 
 One rulebook for every AI coding agent on this machine: Claude Code, Codex, Gemini CLI, Antigravity, Cursor,
-OpenCode, Copilot, DSH, and whatever comes next.
+OpenCode, Copilot, DSH, Qwen Code, Trae, Qoder, and whatever comes next.
 
 AI agents copy what they see. If a repo has `any` types, swallowed errors, or `/Users/me/` paths, the next agent
 writes more of them. agent-guard gives every agent the same instructions and skills, checks what each one adds
@@ -15,8 +15,8 @@ agent, it can turn the correction into a rule proposal, and you approve it once 
 
 | Layer | Where | Covers |
 | --- | --- | --- |
-| Global instructions | `global/AGENTS.md`, symlinked to `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.gemini/GEMINI.md`, `~/.config/opencode/AGENTS.md`, `~/.copilot/copilot-instructions.md`, `~/.agents/AGENTS.md` | every agent that reads a global instructions file (Cursor gets it injected by its session-start hook) |
-| Shared skills | `~/.agents/skills` pool; your own skills live in `skills/` here | Codex, Gemini, OpenCode and DSH read the pool directly; Claude, Cursor, Copilot and Antigravity get symlinks |
+| Global instructions | `global/AGENTS.md`, symlinked to `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md`, `~/.gemini/GEMINI.md`, `~/.config/opencode/AGENTS.md`, `~/.copilot/copilot-instructions.md`, `~/.qwen/QWEN.md`, `~/.agents/AGENTS.md` | every agent that reads a global instructions file (Cursor gets it injected by its session-start hook; Trae and Qoder keep user rules in their app settings, so paste it there) |
+| Shared skills | `~/.agents/skills` pool; your own skills live in `skills/` here | Codex, Gemini, OpenCode and DSH read the pool directly; Claude, Cursor, Copilot, Antigravity, Qwen Code, Trae and Qoder get symlinks |
 | Agent hooks | each agent's user-level hook config (`adapters/*.yaml`) | warnings right after an edit or command, the rule list at session start, an unresolved-warnings summary at the end of a turn |
 | Global git hooks | `git config --global core.hooksPath ~/.agent-guard/git-hooks` | every commit in every repo, by any agent or person; the repo's own hooks still run afterwards |
 | Secret scanning | [gitleaks](https://github.com/gitleaks/gitleaks) at commit time, built-in patterns on every edit | keys, tokens, private keys |
@@ -31,8 +31,14 @@ guard doctor          # every agent wired? any new agent without an adapter?
 
 Codex runs new hooks only after you trust them: open Codex, run `/hooks`, and trust the agent-guard entries.
 
-`guard install` is idempotent. Re-run it after adding an adapter or a skill. Everything it replaces is backed
-up first under `~/.agent-guard/backups/`, and `guard uninstall` puts it all back.
+`guard install` is idempotent: it only writes files that need to change, and `guard install --dry-run` shows what
+it would do. Re-run it after adding an adapter or a skill. Before it replaces any real file or folder it saves a
+copy under `~/.agent-guard/backups/<run>/`, every time. That includes files that appeared after the first install,
+such as an editor saving over a linked `CLAUDE.md`. Settings files it can't parse (for example JSON with comments)
+are left alone and reported.
+
+`guard uninstall` puts back everything the first install changed and removes agent-guard's hooks from settings
+you edited since. `guard uninstall --purge` also deletes the runtime, logs and backups.
 
 ## Daily use
 
@@ -43,7 +49,7 @@ up first under `~/.agent-guard/backups/`, and `guard uninstall` puts it all back
 | `guard scan <repo>` | Bad patterns already in a repo that agents will copy |
 | `guard rules` | Rules that apply in the current repo |
 | `guard check [--staged]` | Check uncommitted changes now |
-| `guard doctor` | Health check, including agents installed since the last install |
+| `guard doctor` | Health check: every agent wired, rules valid, agents installed since the last install, and repos whose own `core.hooksPath` skips the global git hooks |
 
 ## Rules
 
@@ -90,6 +96,12 @@ templates/           OpenCode plugin
 tests/               pytest; tests never touch your real home, state or git config
 ```
 
-Limits: agents without hook support (Antigravity, DSH until its experimental hooks plugin is enabled) are only
-checked at commit time. A repo with its own local `core.hooksPath` (for example husky) bypasses the global git
-hooks. Pattern rules catch text, not intent; judgement calls belong in `global/AGENTS.md`.
+Limits:
+- Agents without hook support (Antigravity, Qwen Code, Trae, Qoder, and DSH until its experimental
+  `@deepseek-ai/dsh-hooks-claude-code` plugin is installed) get the rules and skills but are only checked at
+  commit time.
+- A repo with its own local `core.hooksPath` (for example husky) skips the global git hooks. `guard doctor` lists
+  these repos and the two lines to add to their hooks.
+- Command rules match the command's text, so a command that only mentions a pattern (for example as an argument
+  to `guard check --command`) can still warn.
+- Pattern rules catch text, not intent; judgement calls belong in `global/AGENTS.md`.
