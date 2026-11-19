@@ -1,0 +1,3 @@
+# Deliberately fake AWS key in a test fixture (checks that no-secrets flags it).
+tests/test_rules_and_checks.py:aws-access-token:40
+315417c14c9cc9d9e33a31a4988c6e555e0fa226:tests/test_rules_and_checks.py:aws-access-token:40
