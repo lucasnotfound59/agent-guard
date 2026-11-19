@@ -8,7 +8,7 @@ import subprocess
 from pathlib import Path
 
 from agent_guard import adapters as ad
-from agent_guard import secrets, skills
+from agent_guard import config, events, secrets, skills
 from agent_guard.paths import contract, expand, git_hooks_dir, guard_bin, repo_root
 from agent_guard.rules import global_rules, validate
 
@@ -41,6 +41,39 @@ def _global_hooks_path() -> str:
     return r.stdout.strip()
 
 
+OPENCODE_LOG = "~/.local/share/opencode/log/opencode.log"
+
+
+def opencode_plugin_error(plugin_file: Path) -> str | None:
+    """The cause, if OpenCode's own log says the last attempt to load our plugin failed."""
+    log = expand(OPENCODE_LOG)
+    if not log.is_file():
+        return None
+    try:
+        with log.open("rb") as fh:
+            fh.seek(max(0, log.stat().st_size - 2_000_000))
+            tail = fh.read().decode("utf-8", errors="replace").splitlines()
+    except OSError:
+        return None
+    mine = [line for line in tail if str(plugin_file) in line and ("loading plugin" in line or "failed to load" in line)]
+    if not mine or "failed to load" not in mine[-1]:
+        return None
+    cause = mine[-1].split("cause=", 1)[-1]
+    return cause[:240]
+
+
+def local_hook_overrides() -> list[tuple[Path, str]]:
+    """Repos under scan_roots whose own core.hooksPath (e.g. husky) replaces the global agent-guard hooks."""
+    out: list[tuple[Path, str]] = []
+    for repo in config.find_repos():
+        r = subprocess.run(["git", "-C", str(repo), "config", "--local", "--get", "core.hooksPath"],
+                           capture_output=True, text=True)
+        hp = r.stdout.strip()
+        if hp and Path(os.path.expanduser(hp)) != git_hooks_dir():
+            out.append((repo, hp))
+    return out
+
+
 def results() -> list[tuple[str, str]]:
     """(level, message) with level in ok | warn | fail | info."""
     out: list[tuple[str, str]] = []
@@ -59,6 +92,10 @@ def results() -> list[tuple[str, str]]:
         add(("ok", "global git hooks active") if ok else ("fail", "git hook dispatcher missing in ~/.agent-guard/git-hooks"))
     else:
         add(("fail", f"git core.hooksPath is {hp or 'unset'}, expected {contract(git_hooks_dir())}"))
+    for repo, own in local_hook_overrides():
+        add(("warn", f"{contract(repo)} sets its own core.hooksPath ({own}), so agent-guard's commit checks don't run "
+                     f"there. Add `{contract(gb)} git pre-commit` and `{contract(gb)} git commit-msg \"$1\"` to those "
+                     "hooks, or remove the local setting"))
 
     rules = global_rules("active")
     bad = [f"{r.id}: {'; '.join(validate(r))}" for r in rules if validate(r)]
@@ -93,6 +130,19 @@ def results() -> list[tuple[str, str]]:
             add(("info", f"{a.title}: {a.notes}"))
     out.extend(skills.status(ad.load_all()))
 
+    seen = {r.get("agent") for r in events.read_log(_days_ago(30))}
+    for a in ad.load_all():
+        if not a.detected() or ad.hooks_present(a) is not True:
+            continue
+        if a.hooks_writer == "opencode-plugin":
+            err = opencode_plugin_error(expand(a.hooks_file))
+            if err:
+                add(("fail", f"{a.title}: OpenCode failed to load the agent-guard plugin: {err}"))
+                continue
+        if a.name not in seen:
+            add(("warn", f"{a.title}: no hook events from it in 30 days. Start a session to check its hooks run"
+                         + (f" ({a.notes})" if a.notes else "")))
+
     for name, spec in KNOWN_AGENTS.items():
         bins = [b for b in spec["bin"] if b not in covered_bins and shutil.which(b)]
         dirs = [d for d in spec["dirs"] if str(expand(d)) not in covered_dirs and expand(d).exists()]
@@ -102,8 +152,15 @@ def results() -> list[tuple[str, str]]:
     return out
 
 
+def _days_ago(n: int) -> float:
+    import time
+
+    return time.time() - n * 86400
+
+
 def quick_issues() -> list[str]:
-    return [m for lvl, m in results() if lvl in ("fail", "warn") and "proposal" not in m]
+    """Problems worth a notification (pending proposals and quiet agents only show in `guard doctor`)."""
+    return [m for lvl, m in results() if lvl in ("fail", "warn") and "proposal" not in m and "no hook events" not in m]
 
 
 def render(res: list[tuple[str, str]]) -> str:

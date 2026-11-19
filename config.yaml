@@ -6,7 +6,7 @@ notify:
   enabled: true            # macOS notifications for warnings
   debounce_seconds: 300    # at most one per agent+repo every 5 minutes
 
-scan_roots:                # where `guard review` looks for repos when dry-running a proposed rule
+scan_roots:                # where `guard review` dry-runs proposed rules and `guard doctor` looks for repos
   - ~/Documents
 
 post_command_max_files: 200  # skip the post-command file check in repos with more changed files than this
