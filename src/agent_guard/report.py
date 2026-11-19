@@ -11,7 +11,7 @@ from pathlib import Path
 from agent_guard import events, secrets
 from agent_guard.checks import check_files
 from agent_guard.diff import _git, whole_file
-from agent_guard.rules import active_rules
+from agent_guard.rules import active_rules, path_matches
 
 
 def parse_since(s: str) -> float:
@@ -63,7 +63,10 @@ def scan(path: str, rule_id: str | None = None, limit: int = 5) -> str:
     findings = check_files(rules, files, project.exclude_paths, include_size=False)
     secret_rule = next((r for r in rules if r.id == "no-secrets"), None)
     if secret_rule and secrets.available():
-        findings = secrets.merge(findings, secrets.directory(root, secret_rule))
+        known = set(tracked)  # gitleaks also reads untracked and ignored files; scan covers tracked ones
+        extra = [f for f in secrets.directory(root, secret_rule)
+                 if f.path in known and not path_matches(f.path, project.exclude_paths)]
+        findings = secrets.merge(findings, extra)
     by_rule: dict[str, list] = {}
     for f in findings:
         by_rule.setdefault(f.rule.id, []).append(f)
