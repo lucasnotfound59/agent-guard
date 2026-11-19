@@ -8,6 +8,7 @@ again (we never touch anyone else's).
 
 from __future__ import annotations
 
+import copy
 import json
 import shutil
 from dataclasses import dataclass, field
@@ -16,7 +17,7 @@ from typing import Any, Callable
 
 import yaml
 
-from agent_guard.paths import expand, guard_bin, repo_root
+from agent_guard.paths import contract, expand, guard_bin, repo_root
 from agent_guard.state import InstallState
 
 MARK = ".agent-guard/bin/guard hook"
@@ -161,28 +162,48 @@ def _strip(hooks: dict) -> dict:
 OWNED_FILE_WRITERS = {"copilot-hooks", "opencode-plugin"}
 
 
-def install_hooks(adapter: Adapter, state: InstallState) -> str | None:
+def install_hooks(adapter: Adapter, state: InstallState, dry_run: bool = False) -> str | None:
+    """Add (or refresh) our hook entries. Writes only when something changes; never touches a file it can't parse."""
     w = adapter.hooks_writer
     if w == "none" or not adapter.hooks_file:
         return None
     path = expand(adapter.hooks_file)
-    state.record(path)
+    shown = contract(path)
     if w == "opencode-plugin":
         tpl = (repo_root() / "templates" / "opencode-plugin.js").read_text(encoding="utf-8")
+        content = tpl.replace("__GUARD_BIN__", str(guard_bin())).replace("__AGENT__", adapter.name)
+        if path.is_file() and path.read_text(encoding="utf-8", errors="replace") == content:
+            return f"plugin up to date ({shown})"
+        if dry_run:
+            return f"would write plugin {shown}"
+        state.record(path)
         path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(tpl.replace("__GUARD_BIN__", str(guard_bin())).replace("__AGENT__", adapter.name),
-                        encoding="utf-8")
-        return f"wrote plugin {path}"
+        path.write_text(content, encoding="utf-8")
+        return f"wrote plugin {shown}"
     spec = hook_spec(adapter)
+    try:
+        old: Any = _read_json(path)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        if w not in OWNED_FILE_WRITERS:
+            return (f"skipped: {shown} is not plain JSON (comments or a syntax error), so agent-guard left it alone. "
+                    "Fix it, then re-run `guard install`.")
+        old = None
     if w == "copilot-hooks":
-        _write_json(path, {"version": 1, "hooks": spec})
-        return f"wrote {path}"
-    doc = _read_json(path)
-    if w == "cursor-hooks":
-        doc.setdefault("version", 1)
-    doc["hooks"] = _merge(doc.get("hooks") or {}, spec)
-    _write_json(path, doc)
-    return f"merged hooks into {path}"
+        new: dict = {"version": 1, "hooks": spec}
+    else:
+        if not isinstance(old, dict):
+            return f"skipped: {shown} does not hold a JSON object, so agent-guard left it alone."
+        new = copy.deepcopy(old)
+        if w == "cursor-hooks":
+            new.setdefault("version", 1)
+        new["hooks"] = _merge(copy.deepcopy(old.get("hooks") or {}), spec)
+    if path.exists() and old == new:
+        return f"hooks up to date ({shown})"
+    if dry_run:
+        return f"would add hooks to {shown}"
+    state.backup(path)
+    _write_json(path, new)
+    return f"{'wrote' if w in OWNED_FILE_WRITERS else 'merged hooks into'} {shown}"
 
 
 def uninstall_hooks(adapter: Adapter, state: InstallState) -> str | None:
@@ -199,7 +220,13 @@ def uninstall_hooks(adapter: Adapter, state: InstallState) -> str | None:
         return f"removed {path}"
     if not path.exists():
         return None
-    doc = _read_json(path)
+    try:
+        doc = _read_json(path)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        return f"left {contract(path)} alone: it is not plain JSON (remove any agent-guard hooks in it by hand)"
+    if not isinstance(doc, dict):
+        return None
+    before = copy.deepcopy(doc)
     hooks = _strip(doc.get("hooks") or {})
     if hooks:
         doc["hooks"] = hooks
@@ -209,10 +236,17 @@ def uninstall_hooks(adapter: Adapter, state: InstallState) -> str | None:
         # If nothing else changed since install, put back the exact original bytes (or remove our file).
         if orig["type"] == "missing" and doc in ({}, {"version": 1}):
             return state.restore(str(path))
-        if orig["type"] == "file" and doc == _read_json(Path(orig["backup"])):
-            return state.restore(str(path))
+        if orig["type"] == "file":
+            try:
+                same = doc == _read_json(Path(orig["backup"]))
+            except (OSError, json.JSONDecodeError, UnicodeDecodeError):
+                same = False
+            if same:
+                return state.restore(str(path))
+    if doc == before:
+        return None  # none of our hooks in there; don't rewrite the user's file
     _write_json(path, doc)
-    return f"removed agent-guard hooks from {path}"
+    return f"removed agent-guard hooks from {contract(path)}"
 
 
 def hooks_present(adapter: Adapter) -> bool | None:

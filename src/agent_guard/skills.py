@@ -105,8 +105,7 @@ def sync(adapters: list[Adapter], state: InstallState, dry_run: bool = False) ->
                     elif _mtime(entry) > _mtime(target):
                         log.append(f"{a.name}: {name} differs from the pool; kept the newer copy from {contract(entry)}")
                         if not dry_run:
-                            if not target.is_symlink():
-                                state.record(target)
+                            state.backup(target)
                             remove_path(target)
                             shutil.copytree(entry, target, symlinks=True)
                     else:
@@ -118,7 +117,7 @@ def sync(adapters: list[Adapter], state: InstallState, dry_run: bool = False) ->
                         state.record(target)
                         shutil.copytree(entry, target, symlinks=True)
                 if not dry_run:
-                    state.record(entry)
+                    state.backup(entry)
                     remove_path(entry)
 
     # 3. link or dedupe per agent
@@ -144,14 +143,14 @@ def sync(adapters: list[Adapter], state: InstallState, dry_run: bool = False) ->
                         if link.is_symlink() and not link.exists() and _resolves_into(link, P):
                             log.append(f"{a.name}: removed broken link {link.name}")
                             if not dry_run:
-                                state.record(link)
+                                state.backup(link)
                                 link.unlink()
             elif a.skills_mode == "native" and d.is_dir():
                 for link in sorted(d.iterdir()):
                     if _resolves_into(link, P):
                         log.append(f"{a.name}: removed duplicate link {link.name} (it reads ~/.agents/skills itself)")
                         if not dry_run:
-                            state.record(link)
+                            state.backup(link)
                             link.unlink()
     return log
 

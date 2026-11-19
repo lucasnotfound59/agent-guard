@@ -87,13 +87,9 @@ def install(dry_run: bool = False) -> list[str]:
             log.append(f"{a.title}: {contract(p)} -> global/AGENTS.md")
             if not dry_run:
                 symlink(p, target, state)
-        if dry_run:
-            if a.hooks_writer != "none":
-                log.append(f"{a.title}: would add hooks to {a.hooks_file}")
-            continue
-        msg = ad.install_hooks(a, state)
+        msg = ad.install_hooks(a, state, dry_run=dry_run)
         if msg:
-            log.append(f"{a.title}: {msg.replace(str(Path.home()), '~')}")
+            log.append(f"{a.title}: {msg}")
     log += skills.sync(adapters, state, dry_run=dry_run)
     if not dry_run:
         state.save()

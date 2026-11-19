@@ -4,6 +4,8 @@ from pathlib import Path
 
 import pytest
 
+from agent_guard.gitcmd import AGENT_ENV_HINTS
+
 
 @pytest.fixture(autouse=True)
 def isolated(tmp_path, monkeypatch):
@@ -15,8 +17,7 @@ def isolated(tmp_path, monkeypatch):
     monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(home / ".gitconfig"))
     monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
     monkeypatch.setenv("AGENT_GUARD_NOTIFY", "0")
-    for var in ("CLAUDECODE", "CLAUDE_CODE_ENTRYPOINT", "CODEX_THREAD_ID", "CODEX_SANDBOX", "CODEX_HOME",
-                "GEMINI_CLI", "CURSOR_AGENT", "CURSOR_TRACE_ID", "OPENCODE", "DSH_HOME"):
+    for var, _agent in AGENT_ENV_HINTS:  # tests run as "the user", even when an agent runs pytest
         monkeypatch.delenv(var, raising=False)
     (home / ".gitconfig").write_text("[user]\n\tname = Test\n\temail = test@example.com\n[init]\n\tdefaultBranch = main\n")
     return home

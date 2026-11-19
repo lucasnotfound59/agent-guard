@@ -81,9 +81,14 @@ def test_install_wires_everything_and_uninstall_restores(isolated):
     hooks_path = subprocess.run(["git", "config", "--global", "core.hooksPath"], capture_output=True, text=True)
     assert hooks_path.stdout.strip() == str(home / ".agent-guard/git-hooks")
 
+    mtime = (home / ".claude/settings.json").stat().st_mtime_ns
+    dry = install.install(dry_run=True)
+    hook_lines = [line for line in dry if "hooks" in line or "plugin" in line]
+    assert hook_lines and all("up to date" in line for line in hook_lines), hook_lines
     install.install()  # idempotent
     settings2 = json.loads((home / ".claude/settings.json").read_text())
     assert len(settings2["hooks"]["Stop"]) == 2
+    assert (home / ".claude/settings.json").stat().st_mtime_ns == mtime  # unchanged files aren't rewritten
 
     install.uninstall()
     assert snapshot(home) == before
@@ -110,6 +115,7 @@ def test_commit_through_global_hook(isolated, repo):
     r = git(repo, "commit", "-m", "update stuff", check=False)
     assert r.returncode == 0, r.stderr  # warn-only: the commit still happens
     assert "no-hardcoded-home-path" in r.stderr and "conventional-commits" in r.stderr
+    assert "git commit --amend" in r.stderr  # commit messages can't carry an allow comment
     kinds = {(e.get("kind"), e.get("rule")) for e in read_log() if e["event"] == "finding"}
     assert ("commit", "no-hardcoded-home-path") in kinds and ("commit-message", "conventional-commits") in kinds
 
@@ -130,3 +136,43 @@ def test_repo_own_hooks_still_run_and_keep_their_exit_code(isolated, repo):
     git(repo, "add", "b.txt")
     r = git(repo, "commit", "-m", "feat: b", check=False)
     assert r.returncode != 0 and "repo hook says no" in r.stderr
+
+
+def test_dry_run_changes_nothing(isolated):
+    home = isolated
+    seed(home)
+    before = snapshot(home)
+    log = install.install(dry_run=True)
+    assert any("would add hooks to ~/.claude/settings.json" in line for line in log), log
+    assert snapshot(home) == before
+
+
+def test_settings_that_are_not_plain_json_are_left_alone(isolated):
+    home = isolated
+    (home / ".gemini").mkdir()
+    jsonc = '// my settings\n{"theme": "dark"}\n'
+    (home / ".gemini/settings.json").write_text(jsonc)
+    log = install.install()
+    assert any("skipped: ~/.gemini/settings.json is not plain JSON" in line for line in log), log
+    assert (home / ".gemini/settings.json").read_text() == jsonc
+    install.uninstall()
+    assert (home / ".gemini/settings.json").read_text() == jsonc
+
+
+def test_reinstall_backs_up_what_replaced_our_links(isolated):
+    """Editors and update tools often save by writing a new file over a symlink; reinstalling must not lose it."""
+    home = isolated
+    seed(home)
+    install.install()
+    md = home / ".claude/CLAUDE.md"
+    md.unlink()
+    md.write_text("my own notes\n")
+    skill = home / ".claude/skills/playwright"
+    skill.unlink()
+    make_skill(skill, "playwright from an update tool")
+    install.install()
+    backups = home / ".agent-guard/backups"
+    assert any(b.read_text() == "my own notes\n" for b in backups.rglob("CLAUDE.md"))
+    assert any("from an update tool" in b.read_text() for b in backups.rglob("playwright/SKILL.md"))
+    assert Path(os.readlink(md)) == repo_root() / "global/AGENTS.md"
+    assert "from an update tool" in (home / ".agents/skills/playwright/SKILL.md").read_text()  # newer copy wins

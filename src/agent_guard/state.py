@@ -3,6 +3,9 @@
 The first time a path is touched we save what was there (missing, a file, a
 symlink, or a directory) under ~/.agent-guard/backups/. Later installs never
 overwrite that record, so `guard uninstall` can always put things back.
+
+Separately, backup() copies a real file or folder every time agent-guard is about
+to replace it, so content that appeared after the first install is never lost.
 """
 
 from __future__ import annotations
@@ -24,7 +27,8 @@ class InstallState:
         if self.path.exists():
             self.data = json.loads(self.path.read_text(encoding="utf-8"))
         self.data.setdefault("originals", {})
-        self._backup_root = state_home() / "backups" / time.strftime("%Y%m%d-%H%M%S")
+        # One folder per run; the microseconds keep two runs in the same second apart.
+        self._backup_root = state_home() / "backups" / f"{time.strftime('%Y%m%d-%H%M%S')}-{time.time_ns() // 1000 % 1_000_000:06d}"
 
     @property
     def originals(self) -> dict[str, dict[str, Any]]:
@@ -52,6 +56,25 @@ class InstallState:
                 parent = parent.parent
             self.originals[key] = {"type": "missing", "created_dirs": created}
         self.save()
+
+    def backup(self, path: Path) -> Path | None:
+        """Record the original (first time only), then save what is at path right now if it is a real
+        file or folder. Call this before replacing or removing anything. Returns the backup location."""
+        self.record(path)
+        if path.is_symlink() or not path.exists():
+            return None
+        dest = self._backup_dest(path)
+        if dest.exists() or dest.is_symlink():  # record() already saved it during this run
+            return dest
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        if path.is_dir():
+            shutil.copytree(path, dest, symlinks=True)
+        else:
+            shutil.copy2(path, dest)
+        self.data.setdefault("backups", []).append(
+            {"path": str(path), "backup": str(dest), "at": time.strftime("%Y-%m-%dT%H:%M:%S")})
+        self.save()
+        return dest
 
     def _backup_dest(self, path: Path) -> Path:
         try:
@@ -104,7 +127,7 @@ def symlink(link: Path, target: Path, state: InstallState) -> bool:
     """Point link at target, recording the original. Returns True if anything changed."""
     if link.is_symlink() and Path(os.readlink(link)) == target:
         return False
-    state.record(link)
+    state.backup(link)
     remove_path(link)
     link.parent.mkdir(parents=True, exist_ok=True)
     os.symlink(target, link)
