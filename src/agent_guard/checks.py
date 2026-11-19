@@ -95,8 +95,8 @@ def check_files(rules: list[Rule], files: list[FileDiff], exclude_paths: list[st
             allowed = rule.check.get("allow") or []
             for f in files:
                 for p in {f.path, f.old_path} - {None, ""}:
-                    if path_matches(p, forbidden) and not path_matches(p, allowed) \
-                            and not path_matches(p, exclude_paths):
+                    # exclude_paths only skips file *contents*; path rules are about the paths themselves.
+                    if path_matches(p, forbidden) and not path_matches(p, allowed) and not path_matches(p, rule.exclude):
                         findings.append(Finding(rule, f"{rule.title}: {p}", p))
                         break
         elif kind == "diff-size" and include_size:

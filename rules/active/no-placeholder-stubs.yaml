@@ -8,7 +8,7 @@ applies_to: ['*.py', '*.js', '*.jsx', '*.ts', '*.tsx', '*.mjs', '*.cjs', '*.java
 check:
   kind: added-line-forbidden
   ignore_case: true
-  pattern: '\b(?:TODO|FIXME|XXX|HACK)\b|\bfor now\b|\bplaceholder\b(?!\s*[=:])|\bsimplified (?:version|implementation|logic)\b|\bnot (?:yet )?implemented\b|\bin a real (?:app|implementation|project)\b|\bmock(?:ed)? (?:data|response|result)s?\b'
+  pattern: '\b(?:TODO|FIXME|XXX|HACK)\b|\bfor now\b|\bplaceholder (?:value|implementation|code|logic|data|text)s?\b|\bsimplified (?:version|implementation|logic)\b|\bnot (?:yet )?implemented\b|\bin a real (?:app|implementation|project)\b|\bmock(?:ed)? (?:data|response|result)s?\b'
 why: Agents leave stubs and "for now" code that looks finished; it ships, and the next agent copies it.
 fix: Finish it, or tell the user exactly what is missing instead of leaving a stub.
 source: { proposed_by: agent-guard starter set, approved_at: 2026-11-20 }

@@ -6,7 +6,7 @@ check:
   kind: path-forbidden
   paths: ['.env', '.env.*', '*.pem', '*.p12', '*.pfx', '*.keystore', '*.jks', 'id_rsa', 'id_ed25519',
           'local.properties', '.credentials*', 'credentials.json', 'service-account*.json', '.npmrc', '.pypirc']
-  allow: ['.env.example', '.env.sample', '.env.template', '*.example']
+  allow: ['.env.example', '.env.sample', '.env.template', '*.example', '*.debug.keystore']  # debug keystores are public by design (FTC SDK ships one)
 why: These files hold secrets or settings for one machine (local.properties holds your SDK path).
 fix: Remove the file from the change and add it to .gitignore; commit a .example version without real values.
 source: { proposed_by: agent-guard starter set, approved_at: 2026-11-20 }

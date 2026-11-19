@@ -63,6 +63,10 @@ def test_globs(path, patterns, expected):
     ("no-silenced-errors", "a.py", "except ValueError as e: log(e)", False),
     ("ftc-no-thread-sleep", "TeamCode/src/main/java/org/x/Auto.java", "Thread.sleep(500);", True),
     ("ftc-no-thread-sleep", "src/main/java/Other.java", "Thread.sleep(500);", False),
+    ("no-skipped-tests", "TeamCode/src/main/java/org/x/Tuner.java", "@Disabled", False),
+    ("no-skipped-tests", "app/src/test/java/FooTest.java", "@Disabled", True),
+    ("no-placeholder-stubs", "a.tsx", "placeholder?: string;", False),
+    ("no-placeholder-stubs", "a.py", "return 42  # placeholder value", True),
 ])
 def test_added_line_rules(rule, path, line, expected):
     assert flagged(rule, path, line) is expected

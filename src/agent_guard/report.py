@@ -56,7 +56,7 @@ def scan(path: str, rule_id: str | None = None, limit: int = 5) -> str:
     root = project.root
     if not root:
         return f"{path} is not inside a git repository"
-    rules = [r for r in rules if r.kind in ("added-line-forbidden", "path-forbidden")
+    rules = [r for r in rules if r.kind in ("added-line-forbidden", "path-forbidden") and r.check.get("scan", True)
              and (rule_id is None or r.id == rule_id)]
     tracked = [p for p in _git(["ls-files", "-z"], root).stdout.split("\0") if p]
     files = [whole_file(root, p, status="M") for p in tracked]

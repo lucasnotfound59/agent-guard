@@ -2,8 +2,9 @@ id: no-skipped-tests
 title: Don't skip or disable tests to get green
 severity: soft
 status: active
-applies_to: ['**']
-exclude: ['*.md']
+# Test files only: in FTC code @Disabled just hides an OpMode from the Driver Station list.
+applies_to: ['**/test/**', '**/tests/**', '**/__tests__/**', '**/src/test/**', '**/src/androidTest/**',
+             '*.test.*', '*.spec.*', 'test_*.py', '*_test.py', '*_test.go', '*Test.java', '*Tests.java', '*Test.kt']
 check:
   kind: added-line-forbidden
   pattern: '\b(?:describe|it|test)\.skip\s*\(|\bx(?:it|describe|test)\s*\(|@Disabled\b|@Ignore\b|pytest\.mark\.skip|unittest\.skip|\bt\.Skip\('
