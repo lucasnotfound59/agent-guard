@@ -127,9 +127,11 @@ def notify(title: str, message: str, key: str = "global", force: bool = False) -
         if not force and stamp.exists() and time.time() - stamp.stat().st_mtime < cfg.get("debounce_seconds", 300):
             return False
         stamp.touch()
-        script = f"display notification {json.dumps(message[:220])} with title {json.dumps(title[:80])}"
-        subprocess.Popen(["osascript", "-e", script], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                         start_new_session=True)
+        # Text goes in as arguments, not inside the script, so quotes and non-ASCII (·, ⚠) need no escaping.
+        subprocess.Popen(["osascript", "-e", "on run argv", "-e",
+                          "display notification (item 1 of argv) with title (item 2 of argv)", "-e", "end run",
+                          message[:220], title[:80]],
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
         return True
     except OSError:
         return False
