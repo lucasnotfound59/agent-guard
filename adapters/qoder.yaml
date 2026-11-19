@@ -1,0 +1,6 @@
+name: qoder
+title: Qoder
+detect: { binaries: [qoder, qodercli], paths: ["~/.qoder"] }
+instructions: []          # Qoder keeps user rules in its app settings; it reads a repo's AGENTS.md
+skills: { mode: link, dirs: ["~/.qoder/skills"] }
+notes: Only skills are shared; paste global/AGENTS.md into Qoder's user rules if you use it. Commits are still checked by the global git hooks.

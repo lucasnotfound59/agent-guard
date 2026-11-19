@@ -1,0 +1,6 @@
+name: qwen-code
+title: Qwen Code
+detect: { binaries: [qwen], paths: ["~/.qwen"] }
+instructions: ["~/.qwen/QWEN.md"]   # Qwen Code (a Gemini CLI fork) reads ~/.qwen/QWEN.md as global context
+skills: { mode: link, dirs: ["~/.qwen/skills"] }
+notes: Hooks not wired yet; its commits are still checked by the global git hooks.

@@ -1,0 +1,6 @@
+name: trae
+title: Trae
+detect: { binaries: [trae], paths: ["~/.trae"] }
+instructions: []          # Trae keeps user rules in its app settings; it reads a repo's AGENTS.md
+skills: { mode: link, dirs: ["~/.trae/skills"] }
+notes: Only skills are shared; paste global/AGENTS.md into Trae's user rules if you use it. Commits are still checked by the global git hooks.
