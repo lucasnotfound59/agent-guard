@@ -4,3 +4,4 @@ detect: { binaries: [opencode], paths: ["~/.config/opencode"] }
 instructions: ["~/.config/opencode/AGENTS.md"]
 skills: { mode: native, dirs: [] }   # OpenCode reads ~/.agents/skills and ~/.claude/skills itself
 hooks: { writer: opencode-plugin, file: "~/.config/opencode/plugins/agent-guard.js" }
+notes: The plugin uses OpenCode's 2.x plugin API (default export with id + setup). If OpenCode can't load it, `guard doctor` shows the error from OpenCode's log.
