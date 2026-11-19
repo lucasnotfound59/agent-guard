@@ -9,7 +9,15 @@ check:
     - '\bgit\s+commit\b[^|;&\n]*\s-(?!-)[a-zA-Z]*n[a-zA-Z]*(?=\s|$)'
     - '\bHUSKY=0\b'
     - '\bSKIP=\S+\s+git\b'
-    - 'core\.hooksPath'
+    # Setting hooksPath (git config [--global] core.hooksPath <value>, git config set ...).
+    # Reads (--get, get, --list, no value) and mere mentions are fine.
+    - '\bgit\b[^|;&\n]*\bconfig\b(?![^|;&\n]*(?:--get|\s--list\b|\s-l\b|\sget\s))[^|;&\n]*\s(?i:core\.hookspath)\s+(?!\d*>)[^\s|;&<>]'
+    - '\bgit\b[^|;&\n]*\bconfig\b[^|;&\n]*(?:--unset(?:-all)?|\sunset)\s+(?i:core\.hookspath)\b'
+    - '\bgit\b[^|;&\n]*\s-c\s*(?i:core\.hookspath)='
 why: Hooks are how every agent's work gets checked; skipping them hides problems from the user.
 fix: Run the commit normally and fix (or explain) what the hook reports. Only the user changes hook setup.
-source: { proposed_by: agent-guard starter set, approved_at: 2026-11-20 }
+source:
+  proposed_by: agent-guard starter set
+  approved_at: 2026-11-20
+  revised_at: 2026-11-20
+  revision: "Only flag commands that set, unset or override core.hooksPath, not reads or mentions. User approved: 'Yes, narrow it'."
