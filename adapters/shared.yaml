@@ -1,0 +1,7 @@
+# The shared ~/.agents layer: read natively by DSH, Codex/Gemini/OpenCode (skills),
+# and the emerging cross-agent standard, so future agents pick it up with no adapter.
+name: shared
+title: Shared ~/.agents (DSH + future agents)
+detect: { always: true }
+instructions: ["~/.agents/AGENTS.md"]
+skills: { mode: none }

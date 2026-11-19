@@ -1,0 +1,17 @@
+id: no-destructive-git
+title: No force-push, hard reset or discarding work
+severity: hard
+status: active
+check:
+  kind: command-forbidden
+  patterns:
+    - '\bgit\s+push\b[^|;&\n]*\s(?:--force(?!-with-lease|-if-includes)\b|-f\b)'
+    - '\bgit\s+reset\s+[^|;&\n]*--hard\b'
+    - '\bgit\s+clean\s+-[a-zA-Z]*(?:f[a-zA-Z]*d|d[a-zA-Z]*f)'
+    - '\bgit\s+checkout\s+(?:--\s+)?\.(?=\s|$)'
+    - '\bgit\s+restore\s+(?:--[a-z]+\s+)*\.(?=\s|$)'
+    - '\bgit\s+stash\s+(?:drop|clear)\b'
+    - '\bgit\s+branch\s+(?:-D|--delete\s+--force)\b'
+why: These rewrite shared history or throw away uncommitted work (often the user's), with no undo.
+fix: Ask the user first. Prefer --force-with-lease, a new commit, or git stash over deleting work.
+source: { proposed_by: agent-guard starter set, approved_at: 2026-11-20 }

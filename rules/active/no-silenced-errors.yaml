@@ -1,0 +1,15 @@
+id: no-silenced-errors
+title: Don't swallow errors
+severity: soft
+status: active
+applies_to: ['*.py', '*.js', '*.jsx', '*.ts', '*.tsx', '*.mjs', '*.cjs', '*.java', '*.kt', '*.cs', '*.swift', '*.dart', '*.php']
+check:
+  kind: added-line-forbidden
+  multiline: true
+  patterns:
+    - 'catch\s*(?:\([^)]*\))?\s*\{\s*\}'
+    - 'except(?:\s+[\w.,() ]+(?:\s+as\s+\w+)?)?\s*:\s*(?:pass|\.\.\.)\s*$'
+    - '\.catch\(\s*\(\s*\w*\s*\)\s*=>\s*(?:\{\s*\}|null|undefined)\s*\)'
+why: An empty catch hides the real failure, so bugs show up later somewhere unrelated.
+fix: Handle the error, log it with context, or let it propagate. If ignoring is truly right, say why on that line.
+source: { proposed_by: agent-guard starter set, approved_at: 2026-11-20 }

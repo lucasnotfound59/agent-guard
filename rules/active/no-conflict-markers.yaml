@@ -1,0 +1,12 @@
+id: no-conflict-markers
+title: No leftover merge-conflict markers
+severity: hard
+status: active
+applies_to: ['**']
+exclude: ['*.md', '*.rst', '*.txt', '*.adoc']
+check:
+  kind: added-line-forbidden
+  pattern: '^(?:<{7}|={7}|>{7})(?: |$)'
+why: Conflict markers mean a merge was left half-resolved; the file usually won't even compile.
+fix: Resolve the conflict properly (keep the right side or combine both) and delete the marker lines.
+source: { proposed_by: agent-guard starter set, approved_at: 2026-11-20 }

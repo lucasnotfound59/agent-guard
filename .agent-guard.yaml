@@ -1,0 +1,19 @@
+# Project overlay for the agent-guard repo itself (global rules still apply).
+exclude_paths:
+  - tests/**            # test fixtures contain fake secrets, paths and bad patterns on purpose
+
+rules:
+  - id: no-rule-tampering
+    title: Agents must not edit approved rules directly
+    severity: hard
+    status: active
+    check:
+      kind: path-forbidden
+      paths: ['rules/active/*.yaml', 'rules/retired/*.yaml']
+    why: Only the user approves rules; editing them directly skips that review for every agent on the machine.
+    fix: Propose the change with `guard propose`, or describe it to the user and let them edit or approve it.
+
+checks:
+  - name: agent-guard tests
+    run: ~/.agent-guard/venv/bin/python -m pytest -q -x
+    timeout: 120

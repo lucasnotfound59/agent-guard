@@ -1,0 +1,7 @@
+name: cursor
+title: Cursor
+detect: { binaries: [cursor, cursor-agent], paths: ["~/.cursor"] }
+instructions: []          # Cursor has no user-rules file; the sessionStart hook injects the rules instead
+skills: { mode: link, dirs: ["~/.cursor/skills"] }
+hooks: { writer: cursor-hooks, file: "~/.cursor/hooks.json" }
+notes: Cursor shows no hook messages to you, so its warnings arrive as macOS notifications and in `guard report`.

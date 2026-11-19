@@ -1,0 +1,16 @@
+[project]
+name = "agent-guard"
+version = "0.1.0"
+description = "One rulebook for every AI coding agent on this machine: shared instructions and skills, plus warn-only checks on edits, commands and commits."
+requires-python = ">=3.11"
+dependencies = ["pyyaml>=6"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
+# The runtime does not install this package. bin/guard sets PYTHONPATH to src/
+# and runs `python -m agent_guard` from a private venv (see install.sh).
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

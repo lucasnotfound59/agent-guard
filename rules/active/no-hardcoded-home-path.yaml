@@ -1,0 +1,14 @@
+id: no-hardcoded-home-path
+title: No absolute home-directory paths in code
+severity: hard
+status: active
+applies_to: ['**']
+exclude: ['*.md', '*.txt', '*.log', '*.lock', 'package-lock.json', '*.ipynb']
+check:
+  kind: added-line-forbidden
+  patterns:
+    - '(?<![\w.-])/(?:Users|home)/[A-Za-z0-9._-]+/'
+    - '\b[A-Za-z]:\\\\?Users\\\\?[A-Za-z0-9._-]+'
+why: The path breaks on every other machine (teammates, CI, robots) and leaks your username.
+fix: Use a path relative to the project, an environment variable, or the language's home-dir helper (Path.home(), os.homedir()).
+source: { proposed_by: agent-guard starter set, approved_at: 2026-11-20 }

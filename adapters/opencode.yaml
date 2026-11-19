@@ -1,0 +1,6 @@
+name: opencode
+title: OpenCode
+detect: { binaries: [opencode], paths: ["~/.config/opencode"] }
+instructions: ["~/.config/opencode/AGENTS.md"]
+skills: { mode: native, dirs: [] }   # OpenCode reads ~/.agents/skills and ~/.claude/skills itself
+hooks: { writer: opencode-plugin, file: "~/.config/opencode/plugins/agent-guard.js" }

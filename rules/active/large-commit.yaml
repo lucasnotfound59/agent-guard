@@ -1,0 +1,12 @@
+id: large-commit
+title: Keep commits focused
+severity: soft
+status: active
+exclude: ['*.lock', 'package-lock.json', 'pnpm-lock.yaml', 'yarn.lock', '**/generated/**', '**/dist/**']
+check:
+  kind: diff-size
+  max_files: 30
+  max_added_lines: 1000
+why: Huge commits mix unrelated changes, are hard to review, and hard to revert.
+fix: Split it into smaller commits, one logical change each.
+source: { proposed_by: agent-guard starter set, approved_at: 2026-11-20 }

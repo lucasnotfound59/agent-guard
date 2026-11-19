@@ -1,0 +1,10 @@
+id: no-dangerous-rm
+title: No rm -rf on broad paths
+severity: hard
+status: active
+check:
+  kind: command-forbidden
+  pattern: '\brm\s+(?:-[a-zA-Z]*r[a-zA-Z]*f[a-zA-Z]*|-[a-zA-Z]*f[a-zA-Z]*r[a-zA-Z]*|-r\s+-f|-f\s+-r)\s+(?:--\s+)?["'']?(?:/|~/?|\$HOME/?|\.\./?|\*|/\*|~/\*|\.)["'']?(?=\s|$|;|&|\|)'
+why: One typo here deletes your home folder, the repo, or the whole disk.
+fix: Delete the specific paths you mean (rm -r build/), or move things to the Trash.
+source: { proposed_by: agent-guard starter set, approved_at: 2026-11-20 }

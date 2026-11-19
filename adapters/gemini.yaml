@@ -1,0 +1,6 @@
+name: gemini
+title: Gemini CLI
+detect: { binaries: [gemini] }
+instructions: ["~/.gemini/GEMINI.md"]
+skills: { mode: native, dirs: ["~/.gemini/skills"] }  # Gemini reads ~/.agents/skills itself
+hooks: { writer: gemini-settings, file: "~/.gemini/settings.json" }

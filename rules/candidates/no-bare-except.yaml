@@ -1,0 +1,11 @@
+id: no-bare-except
+title: No bare except in Python
+severity: soft
+status: candidate
+applies_to: ['*.py']
+check:
+  kind: added-line-forbidden
+  pattern: '^\s*except\s*:'
+why: A bare except also catches KeyboardInterrupt and SystemExit and hides every kind of bug.
+fix: Catch the specific exception you expect (except ValueError:), or except Exception as e and log it.
+source: { proposed_by: agent-guard starter set, proposed_at: 2026-11-20, evidence: "common agent habit" }

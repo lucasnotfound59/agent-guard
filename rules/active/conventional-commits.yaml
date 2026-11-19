@@ -1,0 +1,11 @@
+id: conventional-commits
+title: Commit messages use Conventional Commits
+severity: hard
+status: active
+check:
+  kind: commit-message
+  pattern: '^(?:feat|fix|patch|docs|style|refactor|perf|test|build|ci|chore|revert|rebase)(?:\([\w./,-]+\))?!?: \S'
+  allow: ['^Merge ', '^Revert "', '^(?:fixup|squash|amend)! ']
+why: Consistent messages make history searchable and changelogs/versions automatic, whoever (or whatever) wrote the commit.
+fix: 'Write <type>(optional scope): <summary>, e.g. "fix(drive): clamp motor power". Types: feat fix patch docs style refactor perf test build ci chore revert rebase.'
+source: { proposed_by: user, approved_at: 2026-11-20, approval_note: "feat, fix, patch, rebase... style chosen by the user" }

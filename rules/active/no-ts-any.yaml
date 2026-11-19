@@ -1,0 +1,12 @@
+id: no-ts-any
+title: No new `any` in TypeScript
+severity: soft
+status: active
+applies_to: ['*.ts', '*.tsx', '*.mts', '*.cts']
+exclude: ['*.d.ts']
+check:
+  kind: added-line-forbidden
+  pattern: ':\s*any\b(?![\w-])|\bas\s+any\b|<any>|\bany\[\]'
+why: '`any` turns off type checking for everything it touches; agents copy it until the types mean nothing.'
+fix: Use the real type, `unknown` plus a type guard, or a generic.
+source: { proposed_by: agent-guard starter set, approved_at: 2026-11-20 }

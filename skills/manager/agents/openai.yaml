@@ -1,0 +1,13 @@
+interface:
+  display_name: "manager"
+  short_description: "Delegate software work and verify the results"
+  default_prompt: "Use $manager to assess this task, choose model tiers and reasoning effort, and delegate planning, implementation, testing, and review while you coordinate, report progress, and verify the results."
+  icon_small: "assets/icon.svg"
+  icon_large: "assets/icon.svg"
+policy:
+  products:
+  - "chatgpt"
+  - "codex"
+  - "api"
+  - "atlas"
+  allow_implicit_invocation: true

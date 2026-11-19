@@ -1,0 +1,11 @@
+id: no-focused-tests
+title: No focused tests (.only)
+severity: hard
+status: active
+applies_to: ['*.js', '*.jsx', '*.ts', '*.tsx', '*.mjs', '*.cjs']
+check:
+  kind: added-line-forbidden
+  pattern: '\b(?:describe|it|test|context)\.only\s*\(|\bf(?:it|describe)\s*\('
+why: A focused test silently skips every other test, so the suite looks green while most of it never runs.
+fix: Remove .only / fit / fdescribe before committing.
+source: { proposed_by: agent-guard starter set, approved_at: 2026-11-20 }

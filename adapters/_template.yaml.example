@@ -1,0 +1,10 @@
+# Copy to adapters/<agent>.yaml to wire a new agent, then run `guard install`.
+# Most new agents copy Claude Code's hook format, so writer: claude-settings often just works
+# (point file at the agent's own settings file). Use writer: none if it has no hooks:
+# its commits are still checked by the global git hooks.
+name: newagent
+title: New Agent
+detect: { binaries: [newagent], paths: ["~/.newagent"] }
+instructions: ["~/.newagent/AGENTS.md"]
+skills: { mode: link, dirs: ["~/.newagent/skills"] }   # or native if it reads ~/.agents/skills
+hooks: { writer: none, file: "" }

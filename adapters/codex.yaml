@@ -1,0 +1,7 @@
+name: codex
+title: Codex
+detect: { binaries: [codex], paths: ["~/.codex"] }
+instructions: ["~/.codex/AGENTS.md"]
+skills: { mode: native, dirs: ["~/.codex/skills"] }   # Codex reads ~/.agents/skills itself
+hooks: { writer: codex-hooks, file: "~/.codex/hooks.json" }
+notes: Codex runs new hooks only after you trust them once - open Codex, run /hooks, trust the agent-guard entries.

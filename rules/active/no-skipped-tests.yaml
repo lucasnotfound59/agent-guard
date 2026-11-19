@@ -1,0 +1,12 @@
+id: no-skipped-tests
+title: Don't skip or disable tests to get green
+severity: soft
+status: active
+applies_to: ['**']
+exclude: ['*.md']
+check:
+  kind: added-line-forbidden
+  pattern: '\b(?:describe|it|test)\.skip\s*\(|\bx(?:it|describe|test)\s*\(|@Disabled\b|@Ignore\b|pytest\.mark\.skip|unittest\.skip|\bt\.Skip\('
+why: Skipping a failing test hides the failure instead of fixing it.
+fix: Fix the code or the test. If it must be skipped, tell the user why and link an issue.
+source: { proposed_by: agent-guard starter set, approved_at: 2026-11-20 }

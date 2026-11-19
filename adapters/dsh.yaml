@@ -1,0 +1,6 @@
+name: dsh
+title: DeepSeek Harness (DSH)
+detect: { binaries: [dsh], paths: ["~/.dsh"] }
+instructions: []          # DSH reads ~/.agents/AGENTS.md itself (shared adapter)
+skills: { mode: native, dirs: ["~/.dsh/skills"] }   # DSH reads ~/.agents/skills itself
+notes: DSH hooks need its experimental dsh-hooks-claude-code plugin; until enabled, DSH is covered by the shared rules and git hooks.

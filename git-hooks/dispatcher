@@ -1,0 +1,20 @@
+#!/bin/sh
+# agent-guard global git hook dispatcher (installed by `guard install` under every hook name).
+# 1. pre-commit / commit-msg: run agent-guard. Warn-only: it never fails the commit.
+# 2. Then run the repo's own hook (e.g. git-lfs, project hooks) and keep ITS exit code,
+#    so setting a global core.hooksPath doesn't silently disable per-repo hooks.
+hook=$(basename "$0")
+GUARD="__GUARD_BIN__"
+case "$hook" in
+  pre-commit|commit-msg)
+    if [ -x "$GUARD" ]; then
+      "$GUARD" git "$hook" "$@" </dev/null || true
+    fi
+    ;;
+esac
+common=$(git rev-parse --git-common-dir 2>/dev/null) || exit 0
+own="$common/hooks/$hook"
+if [ -x "$own" ]; then
+  exec "$own" "$@"
+fi
+exit 0

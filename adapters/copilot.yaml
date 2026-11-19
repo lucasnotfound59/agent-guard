@@ -1,0 +1,6 @@
+name: copilot
+title: GitHub Copilot CLI
+detect: { binaries: [copilot], paths: ["~/.copilot"] }
+instructions: ["~/.copilot/copilot-instructions.md"]
+skills: { mode: link, dirs: ["~/.copilot/skills"] }
+hooks: { writer: copilot-hooks, file: "~/.copilot/hooks/agent-guard.json" }

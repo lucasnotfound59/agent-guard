@@ -1,0 +1,6 @@
+interface:
+  display_name: "DeepSeek Delegate"
+  short_description: "Delegate one Git task to DSH; GPT subagent reviews"
+  default_prompt: "Use $deepseek-delegate for this Git coding task, then have a Codex GPT subagent review the final diff."
+policy:
+  allow_implicit_invocation: false

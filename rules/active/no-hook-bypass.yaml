@@ -1,0 +1,15 @@
+id: no-hook-bypass
+title: Never bypass or rewire git hooks
+severity: hard
+status: active
+check:
+  kind: command-forbidden
+  patterns:
+    - '\bgit\b[^|;&\n]*\s--no-verify\b'
+    - '\bgit\s+commit\b[^|;&\n]*\s-(?!-)[a-zA-Z]*n[a-zA-Z]*(?=\s|$)'
+    - '\bHUSKY=0\b'
+    - '\bSKIP=\S+\s+git\b'
+    - 'core\.hooksPath'
+why: Hooks are how every agent's work gets checked; skipping them hides problems from the user.
+fix: Run the commit normally and fix (or explain) what the hook reports. Only the user changes hook setup.
+source: { proposed_by: agent-guard starter set, approved_at: 2026-11-20 }

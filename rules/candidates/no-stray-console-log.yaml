@@ -1,0 +1,12 @@
+id: no-stray-console-log
+title: No leftover console.log debugging
+severity: soft
+status: candidate
+applies_to: ['*.js', '*.jsx', '*.ts', '*.tsx', '*.mjs', '*.cjs', '*.vue', '*.svelte']
+exclude: ['**/*.test.*', '**/*.spec.*', '**/scripts/**', '**/bin/**', '**/cli/**']
+check:
+  kind: added-line-forbidden
+  pattern: '\bconsole\.log\s*\('
+why: Debug logging left in source code is noise in production; Agent chat already has 14 of them.
+fix: Remove it, or use the project's logger at the right level.
+source: { proposed_by: agent-guard starter set, proposed_at: 2026-11-20, evidence: "14 console.log calls found in Agent chat packages" }

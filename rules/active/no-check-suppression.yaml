@@ -1,0 +1,12 @@
+id: no-check-suppression
+title: Don't silence type checkers or linters
+severity: soft
+status: active
+applies_to: ['**']
+exclude: ['*.md']
+check:
+  kind: added-line-forbidden
+  pattern: '@ts-ignore|@ts-nocheck|eslint-disable|#\s*type:\s*ignore|#\s*noqa\b|#\s*pylint:\s*disable|@SuppressWarnings\(|//\s*nolint\b|#\[allow\('
+why: Suppressing the checker makes the warning go away, not the bug.
+fix: Fix the underlying issue. If a suppression is truly needed, make it narrow and explain why on the line.
+source: { proposed_by: agent-guard starter set, approved_at: 2026-11-20 }

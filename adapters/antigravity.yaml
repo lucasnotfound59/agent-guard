@@ -1,0 +1,6 @@
+name: antigravity
+title: Antigravity
+detect: { paths: ["~/.gemini/antigravity"] }
+instructions: []          # reads ~/.gemini/GEMINI.md, which the gemini adapter links
+skills: { mode: link, dirs: ["~/.gemini/antigravity/skills", "~/.gemini/config/skills"] }
+notes: No user-level hook support known; its commits are still checked by the global git hooks.

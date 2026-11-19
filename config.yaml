@@ -1,0 +1,15 @@
+# agent-guard settings (apply to every agent and repo on this machine)
+
+mode: warn                 # warn: nothing is ever blocked. (enforce is reserved for later.)
+
+notify:
+  enabled: true            # macOS notifications for warnings
+  debounce_seconds: 300    # at most one per agent+repo every 5 minutes
+
+scan_roots:                # where `guard review` looks for repos when dry-running a proposed rule
+  - ~/Documents
+
+post_command_max_files: 200  # skip the post-command file check in repos with more changed files than this
+project_check_timeout: 60    # seconds for each project check at commit time (e.g. FTC Knowledge Bank)
+cursor_stop_followup: false  # true: when Cursor stops with unresolved warnings, send them back as a follow-up
+doctor_interval_hours: 24    # the commit hook runs `guard doctor --quick` at most this often

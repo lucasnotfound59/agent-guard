@@ -1,0 +1,11 @@
+id: ftc-no-thread-sleep
+title: No Thread.sleep in FTC robot code
+severity: soft
+status: candidate
+applies_to: ['**/TeamCode/**/*.java', '**/TeamCode/**/*.kt']
+check:
+  kind: added-line-forbidden
+  pattern: '\bThread\.sleep\s*\('
+why: Thread.sleep freezes the OpMode loop, so sensors, telemetry and stop requests are ignored while it waits.
+fix: Use an ElapsedTime-based state machine, or LinearOpMode.sleep() only in autonomous sequences.
+source: { proposed_by: agent-guard starter set, proposed_at: 2026-11-20, evidence: "17 Thread.sleep calls found in FTC20827-BioBuzz TeamCode" }

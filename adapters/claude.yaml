@@ -1,0 +1,9 @@
+name: claude
+title: Claude Code
+detect: { binaries: [claude], paths: ["~/.claude"] }
+instructions: ["~/.claude/CLAUDE.md"]
+skills:
+  mode: link
+  dirs: ["~/.claude/skills"]
+  exclude: [docx, pdf, pptx, xlsx]   # Claude has these built in (anthropic-skills)
+hooks: { writer: claude-settings, file: "~/.claude/settings.json" }
