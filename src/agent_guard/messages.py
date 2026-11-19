@@ -44,7 +44,10 @@ def for_user(findings: list[Finding], where: str = "") -> str:
     return s
 
 
-def for_terminal(findings: list[Finding], title: str) -> str:
+KEEP_LINE = "Nothing was blocked. Fix it, or keep a line with `agent-guard: allow <rule-id> <reason>`."
+
+
+def for_terminal(findings: list[Finding], title: str, footer: str = KEEP_LINE) -> str:
     if not findings:
         return ""
     out = [f"\n⚠ agent-guard (warn-only) — {title}: {len(findings)} warning(s)"]
@@ -54,7 +57,7 @@ def for_terminal(findings: list[Finding], title: str) -> str:
         if f.snippet():
             out.append(f"      {f.snippet()}")
         out.append(f"      fix: {f.rule.fix}")
-    out.append("  Nothing was blocked. Fix it, or keep a line with `agent-guard: allow <rule-id> <reason>`.\n")
+    out.append(f"  {footer}\n")
     return "\n".join(out)
 
 

@@ -92,9 +92,8 @@ def commit_msg(msg_file: str, cwd: str | None = None) -> int:
         events.log("finding", agent=agent, kind="commit-message", repo=str(project.root) if project.root else None,
                    **f.to_event())
     if findings:
-        _say(messages.for_terminal(findings, "commit message"))
-        _say("  Format: <type>(optional scope): <summary>, e.g. `feat(auth): add login rate limit`.\n"
-             "  Types: feat fix patch docs style refactor perf test build ci chore revert rebase\n")
+        _say(messages.for_terminal(findings, "commit message",
+                                   "Nothing was blocked. Reword it with `git commit --amend` if it isn't pushed yet."))
         name = project.root.name if project.root else "repo"
         events.notify(f"agent-guard · commit · {name}", messages.for_user(findings), key=f"msg:{project.root}")
     return 0
