@@ -1,0 +1,20 @@
+id: commit-subject-length
+title: Commit subjects are at most 72 characters
+severity: soft
+status: candidate
+applies_to:
+- '**'
+check:
+  kind: commit-message
+  pattern: ^.{1,72}$
+  allow:
+  - '^Merge '
+  - ^Revert "
+why: Long subjects get cut off in git log, GitHub and notifications; the user's global rules set a 72-character
+  limit.
+fix: Shorten the subject to 72 characters or fewer and put the detail in the commit body.
+source:
+  proposed_by: claude
+  proposed_at: '2026-11-20'
+  evidence: 'User''s global rules: ''Imperative summary, at most 72 characters.'' Three agent-guard commits
+    by Claude had 76-80 character subjects and conventional-commits did not flag them.'
