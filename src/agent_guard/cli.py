@@ -116,7 +116,7 @@ def _cmd_review(a: argparse.Namespace) -> int:
 def _cmd_approve(a: argparse.Namespace) -> int:
     from agent_guard import review
 
-    msg = review.require_tty()
+    msg = review.require_user()
     if msg:
         print(msg)
         return 2
@@ -130,7 +130,7 @@ def _cmd_approve(a: argparse.Namespace) -> int:
 def _cmd_reject(a: argparse.Namespace) -> int:
     from agent_guard import review
 
-    msg = review.require_tty()
+    msg = review.require_user()
     if msg:
         print(msg)
         return 2
@@ -141,7 +141,11 @@ def _cmd_reject(a: argparse.Namespace) -> int:
 def _cmd_report(a: argparse.Namespace) -> int:
     from agent_guard import report
 
-    print(report.report(a.since))
+    try:
+        print(report.report(a.since))
+    except ValueError as e:
+        print(f"guard report: --since {a.since!r}: {e}", file=sys.stderr)
+        return 2
     return 0
 
 

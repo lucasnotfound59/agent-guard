@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import copy
+import subprocess
 from functools import lru_cache
+from pathlib import Path
 from typing import Any
 
 import yaml
 
-from agent_guard.paths import repo_root
+from agent_guard.paths import expand, repo_root
 
 DEFAULTS: dict[str, Any] = {
     "mode": "warn",  # warn | enforce (enforce is reserved; nothing blocks today)
@@ -38,3 +40,20 @@ def load() -> dict[str, Any]:
     if path.exists():
         data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
     return _merge(DEFAULTS, data)
+
+
+def find_repos(limit: int = 200) -> list[Path]:
+    """Git repos under scan_roots (up to 4 levels deep, skipping node_modules and worktrees)."""
+    found: list[Path] = []
+    for root in load()["scan_roots"]:
+        base = expand(root)
+        if not base.is_dir():
+            continue
+        try:
+            r = subprocess.run(["find", str(base), "-maxdepth", "4", "-name", ".git", "-type", "d",
+                                "-not", "-path", "*/node_modules/*", "-not", "-path", "*/.worktrees/*"],
+                               capture_output=True, text=True, timeout=30)
+        except subprocess.TimeoutExpired:
+            continue
+        found += [Path(p).parent for p in r.stdout.splitlines() if p]
+    return sorted(set(found))[:limit]

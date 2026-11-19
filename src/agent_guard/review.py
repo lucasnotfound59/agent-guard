@@ -17,7 +17,7 @@ import yaml
 from agent_guard import config, events
 from agent_guard.checks import check_files
 from agent_guard.diff import _git, whole_file
-from agent_guard.paths import expand, repo_root
+from agent_guard.paths import repo_root
 from agent_guard.rules import KINDS, Rule, global_rules, validate
 
 CAND = "candidates"
@@ -60,23 +60,10 @@ def propose(*, id: str, title: str, kind: str, patterns: list[str], severity: st
                   f"with `guard review` in a terminal. Tell the user you proposed it.")
 
 
-def _repos(limit: int = 60) -> list[Path]:
-    found: list[Path] = []
-    for root in config.load()["scan_roots"]:
-        base = expand(root)
-        if not base.is_dir():
-            continue
-        r = subprocess.run(["find", str(base), "-maxdepth", "4", "-name", ".git", "-type", "d",
-                            "-not", "-path", "*/node_modules/*", "-not", "-path", "*/.worktrees/*"],
-                           capture_output=True, text=True, timeout=30)
-        found += [Path(p).parent for p in r.stdout.split()]
-    return found[:limit]
-
-
 def dry_run(rule: Rule, time_budget: float = 12.0) -> list[tuple[str, int]]:
     """How many existing lines in your repos the rule would have flagged (it only checks new lines)."""
     start, hits = time.time(), []
-    for repo in _repos():
+    for repo in config.find_repos(limit=60):
         if time.time() - start > time_budget:
             break
         files = [p for p in _git(["ls-files", "-z"], repo).stdout.split("\0") if p and rule.applies(p)][:3000]
@@ -86,7 +73,14 @@ def dry_run(rule: Rule, time_budget: float = 12.0) -> list[tuple[str, int]]:
     return sorted(hits, key=lambda x: -x[1])
 
 
-def require_tty() -> str | None:
+def require_user() -> str | None:
+    """Only the user approves or rejects rules: refuse inside an agent, and without a terminal."""
+    from agent_guard.gitcmd import detect_agent
+
+    agent = detect_agent()
+    if agent != "human-or-unknown":
+        return (f"This is running inside an agent ({agent}). Only the user approves or rejects rules; ask them to "
+                "run `guard review` in their own terminal (Terminal or iTerm, not an agent's shell).")
     if not (sys.stdin.isatty() and sys.stdout.isatty()):
         return ("Approving rules needs the user at an interactive terminal. Agents cannot approve rules; "
                 "ask the user to run `guard review`.")
@@ -98,7 +92,14 @@ def approve(rule_id: str, note: str = "") -> str:
     if not src.exists():
         return f"no candidate {rule_id!r}"
     data = yaml.safe_load(src.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        return f"{src.name} is not a rule (expected a YAML mapping); fix it with [e]dit first"
     data["status"] = "active"
+    errs = validate(Rule.from_dict(data, src))
+    if errs:
+        return f"not approved, {rule_id} is invalid: " + "; ".join(errs)
+    if data.get("id") != rule_id:
+        return f"not approved: the file is {rule_id}.yaml but its id is {data.get('id')!r}; make them match"
     data.setdefault("source", {})["approved_at"] = time.strftime("%Y-%m-%d")
     data["source"]["approved_by"] = "user"
     if note:
@@ -107,8 +108,9 @@ def approve(rule_id: str, note: str = "") -> str:
     dst.write_text(yaml.safe_dump(data, sort_keys=False, allow_unicode=True, width=100), encoding="utf-8")
     src.unlink()
     events.log("approved", rule=rule_id)
-    _commit([dst, src], f"feat(rules): add {rule_id}")
-    return f"approved {rule_id}: now active for every agent and repo"
+    problem = _commit([dst, src], f"feat(rules): add {rule_id}")
+    done = f"approved {rule_id}: now active for every agent and repo"
+    return done + (f" (not committed: {problem})" if problem else "")
 
 
 def reject(rule_id: str, reason: str) -> str:
@@ -116,6 +118,8 @@ def reject(rule_id: str, reason: str) -> str:
     if not src.exists():
         return f"no candidate {rule_id!r}"
     data = yaml.safe_load(src.read_text(encoding="utf-8"))
+    if not isinstance(data, dict):
+        data = {"id": rule_id, "raw": src.read_text(encoding="utf-8")}
     data["status"] = "rejected"
     data.setdefault("source", {})["rejected_reason"] = reason
     dst = _dir("retired") / f"{rule_id}.yaml"
@@ -123,21 +127,35 @@ def reject(rule_id: str, reason: str) -> str:
     dst.write_text(yaml.safe_dump(data, sort_keys=False, allow_unicode=True, width=100), encoding="utf-8")
     src.unlink()
     events.log("rejected", rule=rule_id, reason=reason)
-    _commit([dst, src], f"chore(rules): reject {rule_id}")
-    return f"rejected {rule_id} (kept in rules/retired for history)"
+    problem = _commit([dst, src], f"chore(rules): reject {rule_id}")
+    done = f"rejected {rule_id} (kept in rules/retired for history)"
+    return done + (f" (not committed: {problem})" if problem else "")
 
 
-def _commit(paths: list[Path], message: str) -> None:
+def _commit(paths: list[Path], message: str) -> str | None:
+    """Commit just these paths in the regulation repo. Returns a problem description, or None."""
     root = repo_root()
+    if _git(["rev-parse", "--show-toplevel"], root).returncode != 0:
+        return f"{root} is not a git repository"
     rel = [str(p.relative_to(root)) for p in paths]
-    subprocess.run(["git", "add", "-A", "--", *rel], cwd=root, capture_output=True)
-    # The user's own approval commit: skip our pre-commit hook so it doesn't flag no-rule-tampering.
-    subprocess.run(["git", "-c", "core.hooksPath=/dev/null", "commit", "-q", "-m", message, "--", *rel],
-                   cwd=root, capture_output=True)
+    tracked = set(_git(["ls-files", "-z", "--", *rel], root).stdout.split("\0"))
+    # A path git has never seen and that no longer exists (an agent's uncommitted proposal) would make
+    # `git add` fail for every path, so leave it out.
+    rel = [r for r in rel if (root / r).exists() or r in tracked]
+    add = subprocess.run(["git", "add", "-A", "--", *rel], cwd=root, capture_output=True, text=True)
+    if add.returncode != 0:
+        return add.stderr.strip() or "git add failed"
+    # This commit is the user's own approval from their terminal (require_user), so our pre-commit hook would
+    # only repeat no-rule-tampering back at them; skip it for this one commit.
+    c = subprocess.run(["git", "-c", "core.hooksPath=/dev/null", "commit", "-q", "-m", message, "--", *rel],
+                       cwd=root, capture_output=True, text=True)
+    if c.returncode != 0:
+        return (c.stderr or c.stdout).strip() or "git commit failed"
+    return None
 
 
 def interactive() -> int:
-    msg = require_tty()
+    msg = require_user()
     if msg:
         print(msg)
         return 2
