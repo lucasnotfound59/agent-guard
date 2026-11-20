@@ -44,7 +44,7 @@ you edited since. `guard uninstall --purge` also deletes the runtime, logs and b
 
 | Command | What it does |
 | --- | --- |
-| `guard dashboard` | Local web dashboard: warnings over time, habits, rules and what each caught, the full event log, proposals with a dry-run, a rule tester, and doctor. Read-only |
+| `guard dashboard` | Local web dashboard: warnings over time, habits, rules and what each caught, the full event log, proposals with a dry-run, a rule tester, doctor, and a Toolbox for every agent's skills, MCP servers, plugins and AGENTS.md |
 | `guard report --since 7d` | Which rules each agent breaks most, across all repos (`--since all`, `--json` for scripts). This is how you spot bad habits |
 | `guard review` | Approve, edit or reject rules that agents proposed (needs a terminal, so agents can't approve their own) |
 | `guard scan <repo>` | Bad patterns already in a repo that agents will copy |
@@ -55,7 +55,7 @@ you edited since. `guard uninstall --purge` also deletes the runtime, logs and b
 ## Dashboard
 
 `guard dashboard` serves a page on `127.0.0.1` (any free port, or `--port`) and opens it (`--no-browser` just
-prints the link). It reads the event log, the rule files, git and `guard doctor`, and changes nothing:
+prints the link). It reads the event log, the rule files, git and `guard doctor`. Only the Toolbox changes files:
 
 - **Overview**: warnings per hour/day, top rules, agents, repos, and agent × rule habits, with alerts for hook
   errors, invalid rule files and waiting proposals.
@@ -66,10 +66,19 @@ prints the link). It reads the event log, the rule files, git and `guard doctor`
   sent a hook event.
 - **Proposals**: the evidence, a dry-run against your repos, and the commands to approve or reject. Approving stays
   in your terminal (`guard review`), so an agent with a browser can't approve its own rule.
+- **Toolbox**: every installed agent's MCP servers (Claude Code, Codex, Gemini, Cursor, Copilot, Qwen Code, OpenCode,
+  Antigravity), skills and plugins side by side. Add an MCP server once and install it into the agents you pick,
+  copy one to agents that lack it (converted to each agent's format), switch servers, skills and plugins on or off
+  per agent, remove them, share a skill only one agent has, and edit SKILL.md files and the global AGENTS.md.
+  Every change backs up the file under `~/.agent-guard/backups/`, is refused if the file changed since the page
+  loaded it, and shows in Activity. Secret values (env, headers, token-like arguments) never reach the page.
+  Switched-off servers and skills are kept in `~/.agent-guard/overrides.json` (readable only by you), which
+  `guard install` respects. agent-guard's own skill and OpenCode plugin can't be switched off or removed here.
 
 The link carries a fresh token in its `#fragment`; the page keeps it in memory only. The server answers only
-requests with that token, the exact `127.0.0.1:<port>` Host and no foreign Origin. Ported from FTC Knowledge
-Bank's rule dashboard.
+requests with that token, the exact `127.0.0.1:<port>` Host and no foreign Origin, and changes need its own
+Origin. Anyone holding the link can use the Toolbox, including an agent that started the dashboard, so keep the
+link to yourself. Ported from FTC Knowledge Bank's rule dashboard.
 
 ## Rules
 

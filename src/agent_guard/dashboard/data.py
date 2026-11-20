@@ -94,6 +94,13 @@ def version(log: LogCache) -> str:
         parts.append(("config", (root / "config.yaml").stat().st_mtime_ns))
     except OSError:
         pass
+    from agent_guard.dashboard import toolbox  # the Toolbox's files: agent configs, AGENTS.md, the skill pool
+
+    for f in [*toolbox.watched_files()]:
+        try:
+            parts.append((str(f), f.stat().st_mtime_ns))
+        except OSError:
+            parts.append((str(f), None))
     return hashlib.sha1(repr(parts).encode()).hexdigest()[:16]
 
 

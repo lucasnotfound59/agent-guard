@@ -18,6 +18,7 @@ import os
 import shutil
 from pathlib import Path
 
+from agent_guard import overrides
 from agent_guard.adapters import Adapter
 from agent_guard.paths import contract, expand, repo_root
 from agent_guard.state import InstallState, remove_path, symlink
@@ -32,6 +33,11 @@ def pool() -> Path:
 def own_skills() -> dict[str, Path]:
     d = repo_root() / "skills"
     return {p.name: p for p in sorted(d.iterdir()) if (p / "SKILL.md").exists()} if d.is_dir() else {}
+
+
+def excluded(a: Adapter) -> set[str]:
+    """Skills this agent doesn't get: its adapter's exclude list plus the ones turned off in the dashboard."""
+    return set(a.skills_exclude) | set(overrides.skills_off(a.name))
 
 
 def _is_skill_dir(p: Path) -> bool:
@@ -77,8 +83,11 @@ def sync(adapters: list[Adapter], state: InstallState, dry_run: bool = False) ->
     if not dry_run:
         P.mkdir(parents=True, exist_ok=True)
 
-    # 1. your own skills -> pool
+    # 1. your own skills -> pool (except the ones turned off for every agent in the dashboard)
+    parked = overrides.parked_skills()
     for name, src in own.items():
+        if name in parked:
+            continue
         link = P / name
         if link.is_symlink() and Path(os.readlink(link)) == src:
             continue
@@ -126,8 +135,9 @@ def sync(adapters: list[Adapter], state: InstallState, dry_run: bool = False) ->
     for a in detected:
         for d in map(expand, a.skills_dirs):
             if a.skills_mode == "link":
+                off = excluded(a)
                 for name in skills:
-                    if name in a.skills_exclude:
+                    if name in off:
                         continue
                     link = d / name
                     if link.is_symlink() and (Path(os.readlink(link)) == P / name or link.resolve() == (P / name).resolve()):
@@ -159,7 +169,10 @@ def status(adapters: list[Adapter]) -> list[tuple[str, str]]:
     """(level, message) pairs for doctor."""
     out: list[tuple[str, str]] = []
     P = pool()
+    parked = overrides.parked_skills()
     for name, src in own_skills().items():
+        if name in parked:
+            continue
         link = P / name
         if not (link.is_symlink() and Path(os.readlink(link)) == src):
             out.append(("fail", f"skill {name} is not linked into {contract(P)}"))
@@ -175,7 +188,7 @@ def status(adapters: list[Adapter]) -> list[tuple[str, str]]:
                 out.append(("warn", f"{a.name}: unshared skill folders in {contract(d)}: {', '.join(stray)} "
                                     "(run `guard install` to share them)"))
             if a.skills_mode == "link":
-                missing = [n for n in names if n not in a.skills_exclude and not (d / n).exists()]
+                missing = [n for n in names if n not in excluded(a) and not (d / n).exists()]
                 if missing:
                     out.append(("fail", f"{a.name}: missing skill links in {contract(d)}: {', '.join(missing)}"))
     return out

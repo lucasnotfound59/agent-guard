@@ -6,7 +6,8 @@ Security model (from FTC Knowledge Bank's dashboard):
   browser, never logged); every API call must send it as `Authorization: Bearer <token>`;
 - the Host header must be the exact 127.0.0.1:<port> (stops DNS rebinding), a foreign Origin or a
   cross-site fetch is refused, and POST additionally requires this dashboard's own Origin and JSON;
-- nothing changes rules: approving and rejecting stay in `guard review`, in the user's own terminal.
+- rules never change here: approving and rejecting stay in `guard review`, in the user's own terminal. The
+  Toolbox (skills, MCP servers, plugins, AGENTS.md) can change files, each change backed up and logged.
 """
 
 from __future__ import annotations
@@ -21,7 +22,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import SplitResult, parse_qsl, urlsplit
 
-from agent_guard.dashboard import data
+from agent_guard.dashboard import data, toolbox
 from agent_guard.paths import contract, log_file
 from agent_guard.rules import global_rules
 
@@ -40,8 +41,11 @@ ROUTES = {
     "/api/activity": "GET",
     "/api/proposals": "GET",
     "/api/health": "GET",
+    "/api/toolbox": "GET",
+    "/api/text": "GET",
     "/api/check": "POST",
     "/api/dry-run": "POST",
+    "/api/manage": "POST",
 }
 MAX_BODY = data.MAX_CHECK_TEXT + 64 * 1024
 CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; "
@@ -107,6 +111,13 @@ class Dashboard:
             return data.proposals(self.log, window)
         if path == "/api/health":
             return data.health(self.log, self.health, window, force=q.get("refresh") == "1")
+        if path == "/api/toolbox":
+            return toolbox.inventory()
+        if path == "/api/text":
+            kind = q.get("kind", "")
+            if kind not in ("agents_md", "skill"):
+                raise Problem(400, "malformed_request", "kind must be agents_md or skill")
+            return toolbox.read_text(kind, q.get("name", ""), q.get("agent", ""))
         raise Problem(404, "not_found", "Unknown dashboard route")
 
     def post(self, path: str, body: dict[str, Any]) -> dict[str, Any]:
@@ -114,6 +125,8 @@ class Dashboard:
             return data.check(body)
         if path == "/api/dry-run":
             return data.dry_run(str(body.get("id") or ""))
+        if path == "/api/manage":
+            return toolbox.manage(body)
         raise Problem(404, "not_found", "Unknown dashboard route")
 
 
@@ -161,6 +174,8 @@ def _handler(app: Dashboard) -> type[BaseHTTPRequestHandler]:
                     raise Problem(405, "method_not_allowed", "The page is GET only", {"Allow": "GET, HEAD"})
             except Problem as p:
                 self._error(p.status, p.code, p.message, p.headers)
+            except toolbox.Conflict as e:
+                self._error(409, "conflict", str(e))
             except data.BadRequest as e:
                 self._error(400, "bad_request", str(e))
             except Exception as e:  # report it, keep serving other requests
@@ -275,8 +290,8 @@ def serve(port: int = 0, open_browser: bool = True) -> int:
         print(f"guard dashboard: cannot listen on 127.0.0.1:{port}: {e}", file=sys.stderr)
         return 1
     print(f"agent-guard dashboard: {app.url}")
-    print("Read-only view of the log, rules and proposals. The link holds this run's token, so keep it to "
-          "yourself. Ctrl+C stops it.", flush=True)
+    print("The Toolbox can change agent configs, skills and AGENTS.md (each change backed up and logged); rules "
+          "can't change here. The link holds this run's token, so keep it to yourself. Ctrl+C stops it.", flush=True)
     if open_browser and not webbrowser.open(app.url):
         print("Couldn't open a browser; open the link above yourself.", flush=True)
     try:

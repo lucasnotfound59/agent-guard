@@ -3,10 +3,15 @@
 ## Unreleased
 
 **Dashboard**
-- `guard dashboard`: a local, read-only web view of the event log, rules, proposals and health, ported from FTC
+- `guard dashboard`: a local web view of the event log, rules, proposals and health, ported from FTC
   Knowledge Bank's rule dashboard (loopback only, one-time token, Host/Origin checks, live updates, light and dark).
   It can dry-run proposals and test rules on a repo, diff, command or commit message. Approving stays in
   `guard review`.
+- Dashboard Toolbox: every agent's MCP servers, skills and plugins in one place, plus the global AGENTS.md. Add an
+  MCP server to several agents at once, copy one between agents (format converted), switch servers, skills and
+  plugins on or off per agent, remove them, share single-agent skills, and edit SKILL.md and AGENTS.md. Each change
+  is backed up, refused if the file changed meanwhile, and logged; secret values never reach the page.
+  `guard install` respects skills switched off there (`~/.agent-guard/overrides.json`).
 - `guard report --json` and `guard report --since all`.
 
 **Fixes**

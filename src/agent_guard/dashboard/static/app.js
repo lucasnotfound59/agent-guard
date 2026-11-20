@@ -19,7 +19,7 @@
     if (text !== undefined && text !== null) node.textContent = String(text);
     return node;
   };
-  const append = (node, ...children) => { children.flat().filter(Boolean).forEach(c => node.append(c)); return node; };
+  const append = (node, ...children) => { children.flat(Infinity).filter(Boolean).forEach(c => node.append(c)); return node; };
   const fill = (node, ...children) => { node.replaceChildren(); return append(node, ...children); };
   const list = v => Array.isArray(v) ? v : [];
   const badge = (text, tone) => el('span', 'badge ' + (tone || ''), text);
@@ -46,7 +46,15 @@
   const EVENT_LABELS = {
     finding: 'Warning', suppressed: 'Kept on purpose', session_start: 'Session started', stop_summary: 'Unresolved at turn end',
     proposal: 'Rule proposed', approved: 'Rule approved', rejected: 'Rule rejected', hook_error: 'Hook error',
-    git_hook_error: 'Git hook error', doctor: 'Doctor issues', doctor_error: 'Doctor error', project_check: 'Project check failed'
+    git_hook_error: 'Git hook error', doctor: 'Doctor issues', doctor_error: 'Doctor error', project_check: 'Project check failed',
+    toolbox: 'Toolbox change'
+  };
+  const TOOLBOX_ACTIONS = {
+    'mcp.add': 'Added MCP server', 'mcp.copy': 'Copied MCP server', 'mcp.remove': 'Removed MCP server',
+    'mcp.on': 'Switched MCP server on', 'mcp.off': 'Switched MCP server off', 'plugin.on': 'Switched plugin on',
+    'plugin.off': 'Switched plugin off', 'plugin.remove': 'Removed plugin', 'skill.on': 'Switched skill on',
+    'skill.off': 'Switched skill off', 'skill.remove': 'Removed skill', 'skill.share': 'Shared skill',
+    'skill.save': 'Edited SKILL.md', 'agents_md.save': 'Edited AGENTS.md'
   };
   const KIND_LABELS = {
     'added-line-forbidden': 'forbidden line', 'added-line-required': 'required line', 'path-forbidden': 'forbidden path',
@@ -59,7 +67,7 @@
     if (['hook_error', 'git_hook_error', 'doctor_error', 'project_check', 'rejected'].includes(e)) return 'danger';
     if (e === 'approved') return 'success';
     if (['proposal', 'stop_summary', 'doctor'].includes(e)) return 'warning';
-    if (e === 'suppressed') return 'info';
+    if (e === 'suppressed' || e === 'toolbox') return 'info';
     return '';
   };
   const where = rec => rec.path ? rec.path + (rec.line ? ':' + rec.line : '') : '';
@@ -70,21 +78,24 @@
       case 'stop_summary': return (rec.outstanding || 0) + ' unresolved: ' + list(rec.rules).join(', ');
       case 'doctor': return list(rec.issues)[0] || 'doctor issues';
       case 'project_check': return String(rec.detail || '').trim().split('\n')[0];
+      case 'toolbox': return (TOOLBOX_ACTIONS[rec.action] || rec.action) + ' · ' + (rec.target || '');
       default: return rec.error || rec.event;
     }
   };
-  const eventMeta = rec => [rec.agent, rec.repoName, where(rec), rec.kind].filter(Boolean).join(' · ');
+  const eventMeta = rec => [rec.event === 'toolbox' ? (list(rec.agents).join(', ') || rec.agent) : rec.agent,
+    rec.repoName, where(rec), rec.kind, rec.event === 'toolbox' && rec.by ? 'started by ' + rec.by : null].filter(Boolean).join(' · ');
   const severityTone = s => s === 'hard' ? 'danger' : s === 'soft' ? 'warning' : '';
   const statusTone = s => s === 'active' ? 'success' : s === 'candidate' ? 'warning' : s === 'rejected' ? 'danger' : 'outline';
   const statusLabel = s => s === 'candidate' ? 'proposed' : (s || 'unreadable');
 
   // ---------------------------------------------------------------- state
-  const VIEWS = ['overview', 'rules', 'activity', 'proposals', 'check', 'health'];
+  const VIEWS = ['overview', 'rules', 'activity', 'proposals', 'check', 'toolbox', 'health'];
   const state = {
     view: 'overview', window: store.get('window', '7d'), version: null, loaded: {},
     overview: null, rules: null, rulesRepo: '', ruleFilters: {q: '', status: '', severity: '', kind: '', origin: '', here: ''}, selectedRule: null,
     activity: null, activityFilters: {}, activityQ: '', activityOffset: 0, selectedEvent: null,
-    proposals: null, dryRuns: {}, health: null, repos: [], online: false, pollBusy: false, requests: {}
+    proposals: null, dryRuns: {}, health: null, repos: [], online: false, pollBusy: false, requests: {},
+    toolbox: null, toolTab: store.get('tool-tab', 'mcp'), selectedServer: null, selectedSkill: null, skillQ: '', agentsMd: null, skillEdit: null
   };
   if (!['24h', '7d', '30d', 'all'].includes(state.window)) state.window = '7d';
 
@@ -183,7 +194,7 @@
 
   async function loadView(view, force = false) {
     if (!force && state.loaded[view] && state.loaded[view] === state.version + '|' + state.window) return;
-    const loaders = {overview: loadOverview, rules: loadRules, activity: loadActivity, proposals: loadProposals, check: loadCheck, health: loadHealth};
+    const loaders = {overview: loadOverview, rules: loadRules, activity: loadActivity, proposals: loadProposals, check: loadCheck, toolbox: loadToolbox, health: loadHealth};
     try {
       await loaders[view]();
       state.loaded[view] = state.version + '|' + state.window;
@@ -640,6 +651,299 @@
       results.filter(r => r.level === lvl).map(r => append(el('div', 'doc-row'), el('span', 'doc-icon ' + lvl, icon), el('span', '', r.message))))));
   }
 
+  // ---------------------------------------------------------------- toolbox
+  async function loadToolbox() {
+    const d = await latest('toolbox', () => api('toolbox'));
+    if (!d) return;
+    state.toolbox = d;
+    renderToolbox();
+    if (state.toolTab === 'agentsmd') await loadAgentsMd();
+  }
+  async function act(body, confirmText) {
+    if (confirmText && !window.confirm(confirmText)) return null;
+    try {
+      const r = await api('manage', null, {...body, versions: state.toolbox ? state.toolbox.versions : {}}, 60000);
+      toast(r.done + (r.backup ? ' · backup: ' + r.backup : ''));
+      await loadToolbox();
+      return r;
+    } catch (e) {
+      toast(e.message, true);
+      if (e.status === 409) await loadToolbox();
+      return null;
+    }
+  }
+  function stateChip(label, cls, onClick, title) {
+    const chip = el(onClick ? 'button' : 'span', 'state ' + cls, label);
+    if (title) chip.title = title;
+    if (onClick) { chip.type = 'button'; chip.onclick = e => { e.stopPropagation(); onClick(); }; }
+    return chip;
+  }
+  function switchTab(tab) {
+    state.toolTab = tab;
+    store.set('tool-tab', tab);
+    document.querySelectorAll('#view-toolbox .tab').forEach(b => { const on = b.dataset.tab === tab; b.classList.toggle('active', on); b.setAttribute('aria-selected', on); });
+    ['mcp', 'skills', 'plugins', 'agentsmd'].forEach(t => { $('tab-' + t).hidden = t !== tab; });
+    if (tab === 'agentsmd') loadAgentsMd().catch(e => toast(e.message, true));
+  }
+  function renderToolbox() {
+    const t = state.toolbox;
+    $('count-mcp').textContent = t.mcp.servers.length;
+    $('count-skills').textContent = t.skills.skills.length;
+    $('count-plugins').textContent = t.plugins.plugins.length;
+    renderMcp(); renderSkills(); renderPlugins();
+  }
+
+  function renderMcp() {
+    const m = state.toolbox.mcp;
+    fill($('mcp-errors'), m.agents.filter(a => a.error).map(a => append(el('div', 'notice danger'), el('strong', '', a.title + ': '), a.error)));
+    if (!m.agents.length) { fill($('mcp-matrix'), el('p', 'empty-state', 'None of the agents agent-guard knows about with MCP support is installed.')); return renderMcpDetail(); }
+    if (!m.servers.length) fill($('mcp-matrix'), el('p', 'empty-state', 'No MCP servers yet. Add one and pick the agents that should get it.'));
+    else {
+      const table = el('table', 'matrix');
+      table.append(append(el('thead'), append(el('tr'), el('th', '', 'Server'), m.agents.map(a => { const th = el('th', 'agent', a.title); th.title = a.path; return th; }))));
+      const body = el('tbody');
+      m.servers.forEach(srv => {
+        const tr = el('tr', 'row' + (srv.name === state.selectedServer ? ' selected' : ''));
+        tr.tabIndex = 0;
+        const name = append(el('td', 'name', srv.name), srv.differs ? append(el('span'), ' ', badge('differs', 'warning')) : null);
+        append(tr, name, m.agents.map(a => {
+          const st = srv.agents[a.name];
+          const td = el('td', 'cell');
+          if (!st) td.append(stateChip('—', 'absent', null, a.title + ' doesn\'t have it'));
+          else td.append(stateChip(st, st, () => act({action: 'mcp.toggle', name: srv.name, agent: a.name, on: st !== 'on'}), 'Switch ' + (st === 'on' ? 'off' : 'on') + ' for ' + a.title));
+          return td;
+        }));
+        const pick = () => { state.selectedServer = srv.name; renderMcp(); $('mcp-detail').scrollIntoView({behavior: 'smooth', block: 'nearest'}); };
+        tr.onclick = pick; tr.onkeydown = e => { if (e.key === 'Enter') pick(); };
+        body.append(tr);
+      });
+      fill($('mcp-matrix'), append(table, body));
+    }
+    renderMcpDetail();
+  }
+  function serverLines(s) {
+    const lines = [];
+    if (s.transport === 'stdio') {
+      lines.push('run   ' + [s.command, ...s.args].join(' '));
+      if (s.cwd) lines.push('in    ' + s.cwd);
+      if (s.env.length) lines.push('env   ' + s.env.join(', ') + '  (values hidden)');
+    } else {
+      lines.push(s.transport + '  ' + s.url);
+      if (s.headers.length) lines.push('headers ' + s.headers.join(', ') + '  (values hidden)');
+    }
+    return lines.join('\n');
+  }
+  function renderMcpDetail() {
+    const box = $('mcp-detail');
+    const m = state.toolbox.mcp;
+    const srv = m.servers.find(s => s.name === state.selectedServer);
+    if (!srv) { box.hidden = true; return; }
+    box.hidden = false;
+    const have = m.agents.filter(a => srv.agents[a.name]);
+    const lack = m.agents.filter(a => !srv.agents[a.name]);
+    const head = append(el('div', 'detail-header'), el('div', 'item-id', 'MCP server'), el('h2', '', srv.name),
+      append(el('div', 'badge-row'), badge(srv.server.transport, 'info'), srv.differs ? badge('set up differently per agent', 'warning') : null));
+    const body = el('div', 'detail-body');
+    if (srv.differs) body.append(section('Definition per agent', Object.entries(srv.definedBy).map(([agent, def]) => append(el('div'), el('p', 'muted small', titleOf(agent)), el('pre', 'code', serverLines(def))))));
+    else body.append(section('Definition', el('pre', 'code', serverLines(srv.server))));
+    body.append(section('Agents that have it', have.map(a => {
+      const st = srv.agents[a.name];
+      const toggle = el('button', 'button small', st === 'on' ? 'Switch off' : 'Switch on');
+      toggle.onclick = () => act({action: 'mcp.toggle', name: srv.name, agent: a.name, on: st !== 'on'});
+      const remove = el('button', 'button small', 'Remove');
+      remove.onclick = () => act({action: 'mcp.remove', name: srv.name, agent: a.name}, 'Remove ' + srv.name + ' from ' + a.title + '? Its config file is backed up first.');
+      return append(el('div', 'agent-row'), append(el('span'), el('strong', '', a.title), el('div', 'muted small mono', a.path)), stateChip(st, st), append(el('span', 'badge-row'), toggle, remove));
+    })));
+    if (lack.length) {
+      const picks = append(el('div', 'check-list'), lack.map(a => { const c = el('input'); c.type = 'checkbox'; c.value = a.name; return append(el('label'), c, a.title); }));
+      const source = el('select');
+      have.forEach(a => { const o = el('option', '', a.title); o.value = a.name; source.append(o); });
+      const go = el('button', 'button primary small', 'Copy to the ticked agents');
+      go.type = 'button';
+      go.onclick = () => {
+        const agents = [...picks.querySelectorAll('input:checked')].map(c => c.value);
+        if (!agents.length) return toast('Tick at least one agent.', true);
+        act({action: 'mcp.copy', name: srv.name, source: source.value, agents});
+      };
+      body.append(section('Copy to other agents', picks, append(el('div', 'form-footer'), append(el('label', 'window-picker'), 'from ', source), go),
+        el('p', 'muted small', 'The definition, including secret values, is copied on the server and converted to each agent\'s format. Settings only one agent understands (timeouts, trust) are left out.')));
+    }
+    fill(box, head, body);
+  }
+  function titleOf(agent) {
+    const all = [...(state.toolbox.mcp.agents || []), ...(state.toolbox.skills.agents || [])];
+    return (all.find(a => a.name === agent) || {}).title || state.toolbox.plugins.titles[agent] || agent;
+  }
+  function openMcpAdd() {
+    const m = state.toolbox.mcp;
+    if (!m.agents.length) return toast('No installed agent with MCP support.', true);
+    $('mcp-form').reset();
+    fill($('mcp-form-error'));
+    fill($('mcp-agents'), m.agents.map(a => { const c = el('input'); c.type = 'checkbox'; c.value = a.name; return append(el('label'), c, a.title); }));
+    updateMcpTransport();
+    $('mcp-dialog').showModal();
+  }
+  function updateMcpTransport() {
+    const stdio = $('mcp-transport').value === 'stdio';
+    $('mcp-stdio-fields').hidden = !stdio; $('mcp-http-fields').hidden = stdio;
+  }
+  const lines = v => v.split('\n').map(x => x.trim()).filter(Boolean);
+  function pairs(v, sep) {
+    const out = {};
+    lines(v).forEach(line => { const i = line.indexOf(sep); if (i > 0) out[line.slice(0, i).trim()] = line.slice(i + 1).trim(); });
+    return out;
+  }
+  async function submitMcpAdd(e) {
+    e.preventDefault();
+    const agents = [...$('mcp-agents').querySelectorAll('input:checked')].map(c => c.value);
+    const body = {action: 'mcp.add', name: $('mcp-name').value.trim(), agents, versions: state.toolbox.versions, server: {
+      transport: $('mcp-transport').value, command: $('mcp-command').value.trim(), args: lines($('mcp-args').value),
+      env: pairs($('mcp-env').value, '='), cwd: $('mcp-cwd').value.trim(), url: $('mcp-url').value.trim(), headers: pairs($('mcp-headers').value, ':')}};
+    try {
+      const r = await api('manage', null, body, 60000);
+      $('mcp-dialog').close();
+      toast(r.done + ' · backup: ' + r.backup);
+      state.selectedServer = body.name;
+      await loadToolbox();
+    } catch (err) { fill($('mcp-form-error'), errorNotice(err, 'Not added')); if (err.status === 409) await loadToolbox(); }
+  }
+
+  function renderSkills() {
+    const sk = state.toolbox.skills;
+    const q = (state.skillQ || '').toLowerCase();
+    const shown = sk.skills.filter(s => !q || (s.name + ' ' + s.description).toLowerCase().includes(q));
+    $('skill-count').textContent = shown.length + ' of ' + sk.skills.length + ' skills';
+    $('skill-pool').textContent = 'shared folder: ' + sk.pool;
+    const table = el('table', 'matrix');
+    table.append(append(el('thead'), append(el('tr'), el('th', '', 'Skill'), el('th', '', 'What it does'),
+      sk.agents.map(a => { const th = el('th', 'agent', a.title); th.title = a.mode === 'native' ? 'reads the shared folder itself' : 'gets one link per skill'; return th; }))));
+    const body = el('tbody');
+    shown.forEach(s => {
+      const tr = el('tr', 'row' + (s.name === state.selectedSkill ? ' selected' : ''));
+      tr.tabIndex = 0;
+      append(tr, append(el('td', 'name', s.name), s.locked ? append(el('span'), ' ', badge('required', 'info')) : null, s.parked ? append(el('span'), ' ', badge('off', 'warning')) : null),
+        el('td', 'desc', s.description.length > 110 ? s.description.slice(0, 109) + '…' : s.description),
+        sk.agents.map(a => {
+          const st = s.agents[a.name];
+          const td = el('td', 'cell');
+          const canSwitch = a.mode === 'link' && !s.parked && ['on', 'off', 'missing'].includes(st) && !(s.locked && st === 'on');
+          const tip = {pool: 'reads the shared folder', excluded: 'left out by its adapter (built in there)', 'off-all': 'switched off for every agent', missing: 'link missing: click to add it'}[st];
+          td.append(stateChip(st, st, canSwitch ? () => act({action: 'skill.toggle', name: s.name, agent: a.name, on: st !== 'on'}) : null, tip || (canSwitch ? 'Switch ' + (st === 'on' ? 'off' : 'on') + ' for ' + a.title : '')));
+          return td;
+        }));
+      const pick = () => { state.selectedSkill = s.name; renderSkills(); $('skill-detail').scrollIntoView({behavior: 'smooth', block: 'nearest'}); };
+      tr.onclick = pick; tr.onkeydown = e => { if (e.key === 'Enter') pick(); };
+      body.append(tr);
+    });
+    fill($('skill-matrix'), shown.length ? append(table, body) : el('p', 'empty-state', 'No skills match.'));
+    renderSkillDetail();
+    const un = sk.unshared;
+    fill($('skill-unshared'), un.length ? un.map(u => {
+      const share = el('button', 'button small primary', 'Share with every agent');
+      share.disabled = u.inPool; share.title = u.inPool ? 'the shared folder already has a skill with this name' : '';
+      share.onclick = () => act({action: 'skill.share', name: u.name, agent: u.agent});
+      const edit = el('button', 'button small', 'Edit'); edit.onclick = () => openSkillEditor(u.name, u.agent);
+      const remove = el('button', 'button small', 'Remove');
+      remove.onclick = () => act({action: 'skill.remove', name: u.name, agent: u.agent}, 'Remove ' + u.name + ' from ' + titleOf(u.agent) + '? The folder is backed up first.');
+      return append(el('div', 'plugin-row'), append(el('span'), el('strong', 'mono', u.name), el('div', 'muted small', titleOf(u.agent) + ' · ' + u.path)), el('span', 'muted small', u.description.slice(0, 80)), share, append(el('span', 'badge-row'), edit, remove));
+    }) : el('p', 'empty-state', 'Every skill is shared. Nothing is stuck in one agent.'));
+  }
+  function renderSkillDetail() {
+    const box = $('skill-detail');
+    const s = state.toolbox.skills.skills.find(x => x.name === state.selectedSkill);
+    if (!s) { box.hidden = true; return; }
+    box.hidden = false;
+    const head = append(el('div', 'detail-header'), el('div', 'item-id', s.path), el('h2', '', s.name),
+      append(el('div', 'badge-row'), badge(s.kind === 'own' ? 'your skill (repo skills/)' : 'shared', 'info'), s.parked ? badge('off for every agent', 'warning') : badge('on', 'success'), s.locked ? badge('required by agent-guard', 'outline') : null));
+    const body = el('div', 'detail-body');
+    if (s.description) body.append(section('Description', el('p', 'prose', s.description)));
+    const actions = el('div', 'badge-row');
+    const edit = el('button', 'button small', 'Edit SKILL.md'); edit.onclick = () => openSkillEditor(s.name, null); actions.append(edit);
+    if (!s.locked) {
+      const all = el('button', 'button small', s.parked ? 'Switch on for every agent' : 'Switch off for every agent');
+      all.onclick = () => act({action: 'skill.toggle', name: s.name, on: !!s.parked});
+      const remove = el('button', 'button small', 'Remove');
+      remove.onclick = () => act({action: 'skill.remove', name: s.name}, 'Remove ' + s.name + ' for every agent?' + (s.kind === 'own' ? ' This deletes its folder in the repo\'s skills/ (git can bring it back).' : '') + ' A backup is kept.');
+      actions.append(all, remove);
+    }
+    body.append(section('Change', actions));
+    fill(box, head, body);
+  }
+  async function openSkillEditor(name, agent) {
+    try {
+      const d = await api('text', {kind: 'skill', name, agent: agent || ''});
+      state.skillEdit = {name, agent, version: d.version};
+      $('skill-dialog-title').textContent = name + (agent ? ' (' + titleOf(agent) + ' only)' : '');
+      $('skill-dialog-path').textContent = d.path;
+      $('skill-text').value = d.text;
+      $('skill-dialog-status').textContent = d.lines + ' lines';
+      fill($('skill-form-error'));
+      $('skill-dialog').showModal();
+    } catch (e) { toast(e.message, true); }
+  }
+  async function saveSkill(e) {
+    e.preventDefault();
+    const se = state.skillEdit;
+    try {
+      const r = await api('manage', null, {action: 'text.save', kind: 'skill', name: se.name, agent: se.agent || null, text: $('skill-text').value, base: se.version});
+      $('skill-dialog').close();
+      toast('Saved ' + r.saved + ' · backup: ' + r.backup);
+      await loadToolbox();
+    } catch (err) { fill($('skill-form-error'), errorNotice(err, 'Not saved')); }
+  }
+
+  function renderPlugins() {
+    const p = state.toolbox.plugins;
+    fill($('plugin-errors'), Object.entries(p.errors).map(([a, msg]) => append(el('div', 'notice danger'), el('strong', '', titleOf(a) + ': '), msg)));
+    const groups = {};
+    p.plugins.forEach(x => (groups[x.agent] = groups[x.agent] || []).push(x));
+    const notes = {codex: 'From [plugins] in ~/.codex/config.toml.', claude: 'From enabledPlugins in ~/.claude/settings.json.',
+      opencode: 'npm plugins from opencode.json, and files in ~/.config/opencode/plugins (switched off by renaming to .off).', gemini: 'Extensions in ~/.gemini/extensions (shown only; manage them with `gemini extensions`).'};
+    const names = Object.keys(groups);
+    fill($('plugin-groups'), names.length ? names.map(agent => append(el('section', 'panel'),
+      append(el('div', 'panel-heading'), append(el('div'), el('h2', '', titleOf(agent)), el('p', 'muted small', notes[agent] || ''))),
+      groups[agent].map(x => {
+        const st = x.enabled === null ? 'n/a' : x.enabled ? 'on' : 'off';
+        const toggle = x.canToggle ? stateChip(st, st, () => act({action: 'plugin.toggle', agent, id: x.id, on: !x.enabled}), 'Switch ' + (x.enabled ? 'off' : 'on')) : stateChip(st, x.enabled === null ? 'pool' : st);
+        const remove = el('button', 'button small', 'Remove');
+        remove.hidden = !x.canRemove;
+        remove.onclick = () => act({action: 'plugin.remove', agent, id: x.id}, 'Remove ' + x.id + ' from ' + titleOf(agent) + '? A backup is kept.');
+        return append(el('div', 'plugin-row'), el('span', 'mono', x.id), x.locked ? badge('agent-guard\'s own', 'info') : badge(x.kind, 'outline'), toggle, remove);
+      }))) : append(el('section', 'panel'), el('p', 'empty-state', 'No plugins found for the installed agents.')));
+  }
+
+  async function loadAgentsMd(force = false) {
+    if (state.agentsMd && state.agentsMd.dirty && !force) return;
+    const d = await api('text', {kind: 'agents_md'});
+    state.agentsMd = {version: d.version, dirty: false, info: d};
+    $('agentsmd-text').value = d.text;
+    showAgentsMd(d);
+  }
+  function showAgentsMd(d) {
+    $('agentsmd-info').textContent = d.path + (d.linkedFrom.length ? ' · linked into ' + d.linkedFrom.join(', ') : '');
+    const lines = $('agentsmd-text').value.split('\n').length - ($('agentsmd-text').value.endsWith('\n') ? 1 : 0);
+    const b = $('agentsmd-lines');
+    b.textContent = lines + ' lines'; b.className = 'badge ' + (lines > 80 ? 'warning' : 'success');
+    b.title = 'Every line costs context in every session of every agent; the repo asks for under ~80.';
+    $('agentsmd-save').disabled = !state.agentsMd.dirty;
+    $('agentsmd-status').textContent = state.agentsMd.dirty ? 'Unsaved changes' : 'Saved version ' + state.agentsMd.version;
+  }
+  async function saveAgentsMd(e) {
+    e.preventDefault();
+    const btn = $('agentsmd-save');
+    btn.disabled = true;
+    try {
+      const r = await api('manage', null, {action: 'text.save', kind: 'agents_md', text: $('agentsmd-text').value, base: state.agentsMd.version});
+      state.agentsMd = {version: r.version, dirty: false, info: r};
+      showAgentsMd(r);
+      toast('Saved AGENTS.md for every agent · backup: ' + r.backup);
+    } catch (err) {
+      toast(err.message, true);
+      $('agentsmd-status').textContent = err.status === 409 ? 'Someone else changed it. Copy your text somewhere, press Reload, and redo the change.' : err.message;
+      btn.disabled = false;
+    }
+  }
+
   // ---------------------------------------------------------------- wiring
   function bind() {
     document.querySelectorAll('#navigation .nav-button').forEach(b => { b.onclick = () => switchView(b.dataset.view); });
@@ -669,6 +973,23 @@
       try { await loadHealth(true); state.loaded.health = state.version + '|' + state.window; } catch (err) { toast(err.message, true); }
       finally { b.disabled = false; b.textContent = 'Run doctor again'; }
     };
+    document.querySelectorAll('#view-toolbox .tab').forEach(b => { b.onclick = () => switchTab(b.dataset.tab); });
+    if (!['mcp', 'skills', 'plugins', 'agentsmd'].includes(state.toolTab)) state.toolTab = 'mcp';
+    switchTab(state.toolTab);
+    $('mcp-add-open').onclick = openMcpAdd;
+    $('mcp-transport').onchange = updateMcpTransport;
+    $('mcp-form').onsubmit = submitMcpAdd;
+    $('skill-form').onsubmit = saveSkill;
+    document.querySelectorAll('dialog [data-close]').forEach(b => { b.onclick = () => b.closest('dialog').close(); });
+    let skillTimer;
+    $('skill-search').oninput = e => { clearTimeout(skillTimer); skillTimer = setTimeout(() => { state.skillQ = e.target.value.trim(); if (state.toolbox) renderSkills(); }, 120); };
+    $('agentsmd-text').oninput = () => { if (state.agentsMd) { state.agentsMd.dirty = true; showAgentsMd(state.agentsMd.info); } };
+    $('agentsmd-form').onsubmit = saveAgentsMd;
+    $('agentsmd-reload').onclick = () => {
+      if (state.agentsMd && state.agentsMd.dirty && !window.confirm('Discard your unsaved changes to AGENTS.md?')) return;
+      loadAgentsMd(true).catch(err => toast(err.message, true));
+    };
+    window.addEventListener('beforeunload', e => { if (state.agentsMd && state.agentsMd.dirty) { e.preventDefault(); e.returnValue = ''; } });
     document.addEventListener('visibilitychange', () => { if (!document.hidden) poll(); });
     // A restarted `guard dashboard` prints a new link; opening it in this tab only changes the #fragment.
     window.addEventListener('hashchange', () => {

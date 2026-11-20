@@ -20,9 +20,10 @@
         <button data-view="activity" class="nav-button"><span aria-hidden="true">↳</span>Activity</button>
         <button data-view="proposals" class="nav-button"><span aria-hidden="true">✎</span>Proposals<b id="proposal-count" class="nav-count" hidden></b></button>
         <button data-view="check" class="nav-button"><span aria-hidden="true">✓</span>Check</button>
+        <button data-view="toolbox" class="nav-button"><span aria-hidden="true">▦</span>Toolbox</button>
         <button data-view="health" class="nav-button"><span aria-hidden="true">♥</span>Health</button>
       </nav>
-      <div class="sidebar-bottom"><div class="local-marker"><i></i> LOCAL / 127.0.0.1</div><p>Warn-only: nothing is blocked.<br>Read-only: approvals stay in your terminal.</p><small>Patterns catch text, not intent</small></div>
+      <div class="sidebar-bottom"><div class="local-marker"><i></i> LOCAL / 127.0.0.1</div><p>Warn-only: nothing is blocked.<br>Rule approvals stay in your terminal; Toolbox changes are backed up.</p><small>Patterns catch text, not intent</small></div>
     </aside>
     <div class="workspace">
       <header class="topbar">
@@ -103,6 +104,36 @@
           <div id="check-result"></div>
         </section>
 
+        <section id="view-toolbox" class="view" hidden>
+          <div class="page-heading"><div><div class="eyebrow">SKILLS / MCP / PLUGINS</div><h1>Toolbox</h1><p>Every agent's skills, MCP servers and plugins in one place, plus the AGENTS.md they all read. Each change backs up the file first and shows in Activity.</p></div></div>
+          <div class="tabs" role="tablist" aria-label="Toolbox sections">
+            <button role="tab" class="tab active" data-tab="mcp" aria-selected="true">MCP servers <b id="count-mcp"></b></button>
+            <button role="tab" class="tab" data-tab="skills" aria-selected="false">Skills <b id="count-skills"></b></button>
+            <button role="tab" class="tab" data-tab="plugins" aria-selected="false">Plugins <b id="count-plugins"></b></button>
+            <button role="tab" class="tab" data-tab="agentsmd" aria-selected="false">AGENTS.md</button>
+          </div>
+          <div id="tab-mcp" class="tab-panel">
+            <section class="panel"><div class="panel-heading"><div><h2>Servers by agent</h2><p class="muted small">Pick a server to switch it on or off per agent, copy it to agents that lack it, or remove it. Secret values stay on the server; you see their names only.</p></div><button id="mcp-add-open" class="button primary">＋ Add server</button></div><div id="mcp-errors"></div><div id="mcp-matrix" class="table-wrap"></div></section>
+            <section id="mcp-detail" class="panel detail-panel static" hidden></section>
+          </div>
+          <div id="tab-skills" class="tab-panel" hidden>
+            <section class="panel filters-panel"><label class="search-field"><span aria-hidden="true">⌕</span><input id="skill-search" type="search" placeholder="Search skills by name or description" aria-label="Search skills"></label><div class="filter-summary"><span id="skill-count"></span><span id="skill-pool" class="mono"></span></div></section>
+            <section class="panel"><div class="panel-heading"><div><h2>Shared skills</h2><p class="muted small">Agents marked “pool” read the shared folder themselves, so a skill can only be switched off for all of them at once. The others get a link per skill and can be switched one by one.</p></div></div><div id="skill-matrix" class="table-wrap"></div></section>
+            <section id="skill-detail" class="panel detail-panel static" hidden></section>
+            <section class="panel"><div class="panel-heading"><div><h2>Only in one agent</h2><p class="muted small">Skill folders an agent has that the others don't.</p></div></div><div id="skill-unshared"></div></section>
+          </div>
+          <div id="tab-plugins" class="tab-panel" hidden>
+            <div id="plugin-errors"></div>
+            <div id="plugin-groups"></div>
+          </div>
+          <div id="tab-agentsmd" class="tab-panel" hidden>
+            <section class="panel context-panel"><div class="panel-heading"><div><h2>Global AGENTS.md</h2><p id="agentsmd-info" class="muted small"></p></div><span id="agentsmd-lines" class="badge"></span></div>
+              <form id="agentsmd-form"><textarea id="agentsmd-text" class="code-editor tall" spellcheck="false" aria-label="AGENTS.md text"></textarea>
+                <div class="form-footer"><span id="agentsmd-status" class="muted small" aria-live="polite"></span><span class="badge-row"><button id="agentsmd-reload" type="button" class="button">Reload</button><button id="agentsmd-save" type="submit" class="button primary" disabled>Save</button></span></div></form>
+            </section>
+          </div>
+        </section>
+
         <section id="view-health" class="view" hidden>
           <div class="page-heading"><div><div class="eyebrow">WIRING</div><h1>Health</h1><p>What <code>guard doctor</code> sees, plus when each agent last sent a hook event.</p></div><button id="health-refresh" class="button primary">Run doctor again</button></div>
           <div id="health-stats"></div>
@@ -110,9 +141,35 @@
           <section class="panel"><div class="panel-heading"><div><h2>Doctor</h2><p id="health-checked" class="muted small"></p></div></div><div id="doctor-results"></div></section>
         </section>
       </main>
-      <footer class="workspace-footer"><span>agent-guard</span><span>Local and read-only · one rulebook for every agent</span></footer>
+      <footer class="workspace-footer"><span>agent-guard</span><span>Local only · one rulebook for every agent</span></footer>
     </div>
   </div>
+  <dialog id="mcp-dialog" aria-labelledby="mcp-dialog-title"><form id="mcp-form" class="dialog-shell" method="dialog">
+    <header class="dialog-header"><div><div class="eyebrow">NEW MCP SERVER</div><h2 id="mcp-dialog-title">Add a server</h2></div><button type="button" class="icon-button" data-close aria-label="Close">×</button></header>
+    <div class="dialog-content">
+      <div id="mcp-form-error"></div>
+      <div class="form-grid two"><label>Name<input id="mcp-name" required autocomplete="off" placeholder="filesystem"></label>
+        <label>Transport<select id="mcp-transport"><option value="stdio">stdio (runs a command)</option><option value="http">http (streamable)</option><option value="sse">sse</option></select></label></div>
+      <div id="mcp-stdio-fields">
+        <label>Command<input id="mcp-command" autocomplete="off" placeholder="npx"></label>
+        <label>Arguments, one per line<textarea id="mcp-args" rows="3" placeholder="-y&#10;@modelcontextprotocol/server-filesystem&#10;./docs"></textarea></label>
+        <label>Environment, one NAME=value per line<textarea id="mcp-env" rows="3" placeholder="API_KEY=…"></textarea></label>
+        <label>Working folder (optional)<input id="mcp-cwd" autocomplete="off"></label>
+      </div>
+      <div id="mcp-http-fields" hidden>
+        <label>URL<input id="mcp-url" autocomplete="off" placeholder="https://example.com/mcp"></label>
+        <label>Headers, one Name: value per line<textarea id="mcp-headers" rows="3" placeholder="Authorization: Bearer …"></textarea></label>
+      </div>
+      <fieldset class="mode-picker"><legend>Install into</legend><div id="mcp-agents" class="check-list"></div></fieldset>
+      <p class="muted small">Values you type here are written into each agent's own config file and never shown again on this page.</p>
+    </div>
+    <footer class="dialog-footer"><span class="muted small">Each file is backed up before it changes.</span><button type="submit" class="button primary">Add server</button></footer>
+  </form></dialog>
+  <dialog id="skill-dialog" aria-labelledby="skill-dialog-title"><form id="skill-form" class="dialog-shell" method="dialog">
+    <header class="dialog-header"><div><div id="skill-dialog-path" class="eyebrow"></div><h2 id="skill-dialog-title">Edit skill</h2></div><button type="button" class="icon-button" data-close aria-label="Close">×</button></header>
+    <div class="dialog-content"><div id="skill-form-error"></div><textarea id="skill-text" class="code-editor tall" spellcheck="false" aria-label="SKILL.md text"></textarea></div>
+    <footer class="dialog-footer"><span id="skill-dialog-status" class="muted small"></span><button type="submit" class="button primary">Save SKILL.md</button></footer>
+  </form></dialog>
   <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
 </body>
 </html>
