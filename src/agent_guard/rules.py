@@ -16,7 +16,7 @@ from typing import Any
 
 import yaml
 
-from agent_guard.paths import repo_root
+from agent_guard.paths import private_terms_file, repo_root
 
 KINDS = {
     "added-line-forbidden",
@@ -72,6 +72,48 @@ def path_matches(path: str, patterns: list[str]) -> bool:
     return False
 
 
+# ---------------------------------------------------------------- private terms
+
+# Rules with `check.private_terms: true` also match every line of private_terms_file(). The rule file stays
+# generic (it is committed and pushed), and the user's real name and private e-mails stay on this machine.
+PRIVATE_TERM_KINDS = {"added-line-forbidden", "command-forbidden"}
+_SEPARATOR = r"[\s._-]*"  # "Jane Doe" also matches JaneDoe, jane_doe, jane.doe
+
+
+def private_terms() -> list[str]:
+    try:
+        text = private_terms_file().read_text(encoding="utf-8")
+    except (OSError, UnicodeDecodeError):
+        return []
+    terms = []
+    for line in text.splitlines():
+        t = line.strip()
+        if not t or t.startswith("#"):
+            continue
+        if t.isascii() and len(t) < 3:
+            continue  # initials would match everywhere
+        terms.append(t)
+    return terms
+
+
+@lru_cache(maxsize=8)
+def _term_patterns(terms: tuple[str, ...]) -> tuple[re.Pattern[str], ...]:
+    out = []
+    for t in terms:
+        body = _SEPARATOR.join(re.escape(part) for part in t.split())
+        # ASCII terms match whole words, so "jdoe" inside "jdoes" doesn't count. "_" and a following capital
+        # (camelCase) end a word, so jdoe_token and JaneDoeClient still do. CJK names have no word boundaries
+        # next to other CJK text, so they match anywhere.
+        if t.isascii():
+            body = rf"(?<![A-Za-z0-9]){body}(?!(?-i:[a-z0-9]))"
+        out.append(re.compile(body, re.IGNORECASE))
+    return tuple(out)
+
+
+def private_term_patterns() -> list[re.Pattern[str]]:
+    return list(_term_patterns(tuple(private_terms())))
+
+
 # ---------------------------------------------------------------- model
 
 
@@ -98,7 +140,10 @@ class Rule:
     def patterns(self) -> list[re.Pattern[str]]:
         raw = self.check.get("patterns") or ([self.check["pattern"]] if self.check.get("pattern") else [])
         flags = re.IGNORECASE if self.check.get("ignore_case") else 0
-        return [re.compile(p, flags) for p in raw]
+        out = [re.compile(p, flags) for p in raw]
+        if self.check.get("private_terms") and self.kind in PRIVATE_TERM_KINDS:
+            out += private_term_patterns()
+        return out
 
     def applies(self, path: str) -> bool:
         return path_matches(path, self.applies_to) and not path_matches(path, self.exclude)
@@ -162,8 +207,10 @@ def validate(rule: Rule) -> list[str]:
     if not rule.fix:
         errs.append("fix is required (agents need to know what to do instead)")
     if rule.kind in {"added-line-forbidden", "added-line-required", "command-forbidden", "commit-message"}:
-        if not (rule.check.get("pattern") or rule.check.get("patterns")):
-            errs.append(f"{rule.kind} needs check.pattern or check.patterns")
+        private = bool(rule.check.get("private_terms")) and rule.kind in PRIVATE_TERM_KINDS
+        if not (rule.check.get("pattern") or rule.check.get("patterns") or private):
+            errs.append(f"{rule.kind} needs check.pattern or check.patterns"
+                        + (" (or check.private_terms)" if rule.kind in PRIVATE_TERM_KINDS else ""))
         try:
             rule.patterns()
         except re.error as e:

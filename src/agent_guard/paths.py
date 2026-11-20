@@ -35,6 +35,12 @@ def log_file() -> Path:
     return state_home() / "log" / "events.jsonl"
 
 
+def private_terms_file() -> Path:
+    """The user's own name, username and private e-mails, one per line. Never committed (it lives outside
+    the repo), so rules can match personal details without publishing them."""
+    return state_home() / "private-terms.txt"
+
+
 def session_state_dir() -> Path:
     return state_home() / "state"
 

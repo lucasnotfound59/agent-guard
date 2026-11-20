@@ -9,8 +9,8 @@ from pathlib import Path
 
 from agent_guard import adapters as ad
 from agent_guard import config, events, secrets, skills
-from agent_guard.paths import contract, expand, git_hooks_dir, guard_bin, repo_root
-from agent_guard.rules import global_rules, validate
+from agent_guard.paths import contract, expand, git_hooks_dir, guard_bin, private_terms_file, repo_root
+from agent_guard.rules import global_rules, private_terms, validate
 
 # Agents we know about but may not have an adapter for yet: binaries and config dirs.
 KNOWN_AGENTS: dict[str, dict[str, list[str]]] = {
@@ -104,6 +104,7 @@ def results() -> list[tuple[str, str]]:
     rules = global_rules("active")
     bad = [f"{r.id}: {'; '.join(validate(r))}" for r in rules if validate(r)]
     add(("fail", "invalid rules: " + " | ".join(bad)) if bad else ("ok", f"{len(rules)} active rules valid"))
+    out.extend(_private_terms_status(rules))
     cands = global_rules("candidate")
     if cands:
         add(("warn", f"{len(cands)} rule proposal(s) waiting for you: {', '.join(r.id for r in cands)} (run `guard review`)"))
@@ -154,6 +155,20 @@ def results() -> list[tuple[str, str]]:
             found = ", ".join(bins + [contract(expand(d)) for d in dirs])
             add(("warn", f"unwired agent: {name} ({found}) — add adapters/{name}.yaml, then `guard install`"))
     return out
+
+
+def _private_terms_status(rules: list) -> list[tuple[str, str]]:
+    users = [r.id for r in rules if r.check.get("private_terms")]
+    if not users:
+        return []
+    f = private_terms_file()
+    if not private_terms():
+        return [("warn", f"{', '.join(users)} match your private terms, but {contract(f)} is missing or empty. Put "
+                         "your real name, usernames and private e-mail addresses in it, one per line (it is never "
+                         "committed), then `chmod 600` it")]
+    if f.stat().st_mode & 0o077:
+        return [("warn", f"{contract(f)} is readable by other users on this Mac; run `chmod 600` on it")]
+    return [("ok", f"private terms loaded for {', '.join(users)} ({len(private_terms())} terms)")]
 
 
 def _days_ago(n: int) -> float:
