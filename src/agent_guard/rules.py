@@ -89,6 +89,7 @@ class Rule:
     source: dict[str, Any] = field(default_factory=dict)
     file: Path | None = None
     origin: str = "global"  # global | project
+    load_error: str = ""  # the file could not be read as a rule; validate() reports it
 
     @property
     def kind(self) -> str:
@@ -143,6 +144,8 @@ class Rule:
 
 
 def validate(rule: Rule) -> list[str]:
+    if rule.load_error:
+        return [rule.load_error]
     errs: list[str] = []
     if not ID_RE.match(rule.id):
         errs.append(f"id {rule.id!r} must be kebab-case (a-z, 0-9, -)")
@@ -186,9 +189,23 @@ def load_dir(directory: Path, origin: str = "global") -> list[Rule]:
     if not directory.is_dir():
         return rules
     for f in sorted(directory.glob("*.yaml")):
-        data = yaml.safe_load(f.read_text(encoding="utf-8")) or {}
+        # One unreadable file must not take every other rule down with it (hooks, doctor and review all load
+        # these). It comes back as an invalid rule, so active_rules() skips it and doctor reports it.
+        try:
+            data = yaml.safe_load(f.read_text(encoding="utf-8")) or {}
+        except (OSError, UnicodeDecodeError, yaml.YAMLError) as e:
+            rules.append(_unreadable(f, origin, f"cannot read {f.name}: {type(e).__name__}: {e}"))
+            continue
+        if not isinstance(data, dict):
+            rules.append(_unreadable(f, origin, f"{f.name} is not a rule (expected a YAML mapping)"))
+            continue
         rules.append(Rule.from_dict(data, file=f, origin=origin))
     return rules
+
+
+def _unreadable(f: Path, origin: str, error: str) -> Rule:
+    return Rule(id=f.stem, title="", severity="soft", status="", check={}, file=f, origin=origin,
+                load_error=" ".join(error.split())[:300])
 
 
 def global_rules(status: str = "active") -> list[Rule]:

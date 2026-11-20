@@ -53,7 +53,7 @@ def pre_commit(cwd: str | None = None) -> int:
     cwd = cwd or os.getcwd()
     rules, project = active_rules(cwd)
     root = project.root
-    if not root:
+    if not root or config.ignored_repo(root):
         return 0
     agent = detect_agent()
     findings = check_files(rules, staged(root), project.exclude_paths)
@@ -82,6 +82,8 @@ def pre_commit(cwd: str | None = None) -> int:
 def commit_msg(msg_file: str, cwd: str | None = None) -> int:
     cwd = cwd or os.getcwd()
     rules, project = active_rules(cwd)
+    if project.root and config.ignored_repo(project.root):
+        return 0
     try:
         message = Path(msg_file).read_text(encoding="utf-8", errors="replace")
     except OSError:

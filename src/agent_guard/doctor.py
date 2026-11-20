@@ -62,10 +62,10 @@ def opencode_plugin_error(plugin_file: Path) -> str | None:
     return cause[:240]
 
 
-def local_hook_overrides() -> list[tuple[Path, str]]:
+def local_hook_overrides(repos: list[Path] | None = None) -> list[tuple[Path, str]]:
     """Repos under scan_roots whose own core.hooksPath (e.g. husky) replaces the global agent-guard hooks."""
     out: list[tuple[Path, str]] = []
-    for repo in config.find_repos():
+    for repo in config.find_repos() if repos is None else repos:
         r = subprocess.run(["git", "-C", str(repo), "config", "--local", "--get", "core.hooksPath"],
                            capture_output=True, text=True)
         hp = r.stdout.strip()
@@ -92,7 +92,11 @@ def results() -> list[tuple[str, str]]:
         add(("ok", "global git hooks active") if ok else ("fail", "git hook dispatcher missing in ~/.agent-guard/git-hooks"))
     else:
         add(("fail", f"git core.hooksPath is {hp or 'unset'}, expected {contract(git_hooks_dir())}"))
-    for repo, own in local_hook_overrides():
+    repos, timed_out = config.scan_repos()
+    for root in timed_out:
+        add(("warn", f"finding repos under {root} took over {config.FIND_TIMEOUT}s, so repo checks only cover the "
+                     f"{len(repos)} found in time. Narrow scan_roots in config.yaml"))
+    for repo, own in local_hook_overrides(repos):
         add(("warn", f"{contract(repo)} sets its own core.hooksPath ({own}), so agent-guard's commit checks don't run "
                      f"there. Add `{contract(gb)} git pre-commit` and `{contract(gb)} git commit-msg \"$1\"` to those "
                      "hooks, or remove the local setting"))

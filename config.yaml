@@ -13,3 +13,5 @@ post_command_max_files: 200  # skip the post-command file check in repos with mo
 project_check_timeout: 60    # seconds for each project check at commit time (e.g. FTC Knowledge Bank)
 cursor_stop_followup: false  # true: when Cursor stops with unresolved warnings, send them back as a follow-up
 doctor_interval_hours: 24    # the commit hook runs `guard doctor --quick` at most this often
+ignore_repos:                # the global git hooks skip repos whose absolute path matches (test suites' throwaway repos)
+  - "**/pytest-of-*/**"

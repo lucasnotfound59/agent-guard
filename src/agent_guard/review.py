@@ -73,6 +73,14 @@ def dry_run(rule: Rule, time_budget: float = 12.0) -> list[tuple[str, int]]:
     return sorted(hits, key=lambda x: -x[1])
 
 
+def _load_yaml(path: Path) -> object:
+    """The parsed file, or None when it is not valid YAML (callers then treat it as not a rule)."""
+    try:
+        return yaml.safe_load(path.read_text(encoding="utf-8"))
+    except yaml.YAMLError:
+        return None
+
+
 def require_user() -> str | None:
     """Only the user approves or rejects rules: refuse inside an agent, and without a terminal."""
     from agent_guard.gitcmd import detect_agent
@@ -91,7 +99,7 @@ def approve(rule_id: str, note: str = "") -> str:
     src = _dir(CAND) / f"{rule_id}.yaml"
     if not src.exists():
         return f"no candidate {rule_id!r}"
-    data = yaml.safe_load(src.read_text(encoding="utf-8"))
+    data = _load_yaml(src)
     if not isinstance(data, dict):
         return f"{src.name} is not a rule (expected a YAML mapping); fix it with [e]dit first"
     data["status"] = "active"
@@ -117,7 +125,7 @@ def reject(rule_id: str, reason: str) -> str:
     src = _dir(CAND) / f"{rule_id}.yaml"
     if not src.exists():
         return f"no candidate {rule_id!r}"
-    data = yaml.safe_load(src.read_text(encoding="utf-8"))
+    data = _load_yaml(src)
     if not isinstance(data, dict):
         data = {"id": rule_id, "raw": src.read_text(encoding="utf-8")}
     data["status"] = "rejected"
@@ -181,8 +189,9 @@ def interactive() -> int:
             if ans in ("e", "edit"):
                 editor = __import__("os").environ.get("EDITOR", "nano")
                 subprocess.run([editor, str(rule.file)])
-                fresh = Rule.from_dict(yaml.safe_load(Path(rule.file).read_text(encoding="utf-8")), rule.file)
-                errs = validate(fresh)
+                data = _load_yaml(Path(rule.file))
+                errs = (validate(Rule.from_dict(data, rule.file)) if isinstance(data, dict)
+                        else [f"{Path(rule.file).name} is not valid YAML for one rule"])
                 print("invalid: " + "; ".join(errs) if errs else "saved. approve or reject it now.")
                 continue
             if ans in ("s", "skip", ""):

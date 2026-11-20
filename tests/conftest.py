@@ -17,6 +17,7 @@ def isolated(tmp_path, monkeypatch):
     monkeypatch.setenv("GIT_CONFIG_GLOBAL", str(home / ".gitconfig"))
     monkeypatch.setenv("GIT_CONFIG_NOSYSTEM", "1")
     monkeypatch.setenv("AGENT_GUARD_NOTIFY", "0")
+    monkeypatch.setenv("AGENT_GUARD_CHECK_TEST_REPOS", "1")  # our test repos live in pytest-of-*, which is ignored
     for var, _agent in AGENT_ENV_HINTS:  # tests run as "the user", even when an agent runs pytest
         monkeypatch.delenv(var, raising=False)
     (home / ".gitconfig").write_text("[user]\n\tname = Test\n\temail = test@example.com\n[init]\n\tdefaultBranch = main\n")
