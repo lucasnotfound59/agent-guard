@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased
+## 1.1.0 — 2026-11-20
 
 **Dashboard**
 - `guard dashboard`: a local web view of the event log, rules, proposals and health, ported from FTC

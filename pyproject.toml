@@ -1,6 +1,6 @@
 [project]
 name = "agent-guard"
-version = "1.0.0"
+version = "1.1.0"
 description = "One rulebook for every AI coding agent on this machine: shared instructions and skills, plus warn-only checks on edits, commands and commits."
 requires-python = ">=3.11"
 dependencies = ["pyyaml>=6"]
