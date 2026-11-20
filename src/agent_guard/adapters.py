@@ -15,8 +15,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable
 
-import yaml
-
+from agent_guard.config import load_yaml
 from agent_guard.paths import contract, expand, guard_bin, repo_root
 from agent_guard.state import InstallState
 
@@ -47,7 +46,7 @@ class Adapter:
 
     @classmethod
     def from_file(cls, f: Path) -> "Adapter":
-        d = yaml.safe_load(f.read_text(encoding="utf-8")) or {}
+        d = load_yaml(f.read_text(encoding="utf-8")) or {}
         det = d.get("detect") or {}
         sk = d.get("skills") or {}
         hk = d.get("hooks") or {}

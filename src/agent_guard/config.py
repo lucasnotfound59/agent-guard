@@ -36,12 +36,21 @@ def _merge(base: dict, extra: dict) -> dict:
     return out
 
 
+# libyaml's C loader parses the rule files several times faster than PyYAML's pure-Python one, and every hook
+# (one per tool call of every agent) loads them. Same safe semantics; falls back when libyaml isn't installed.
+_LOADER = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
+
+
+def load_yaml(text: str) -> Any:
+    return yaml.load(text, Loader=_LOADER)
+
+
 @lru_cache(maxsize=1)
 def load() -> dict[str, Any]:
     path = repo_root() / "config.yaml"
     data: dict = {}
     if path.exists():
-        data = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        data = load_yaml(path.read_text(encoding="utf-8")) or {}
     return _merge(DEFAULTS, data)
 
 

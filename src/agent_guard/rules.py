@@ -16,6 +16,7 @@ from typing import Any
 
 import yaml
 
+from agent_guard.config import load_yaml
 from agent_guard.paths import private_terms_file, repo_root
 
 KINDS = {
@@ -239,7 +240,7 @@ def load_dir(directory: Path, origin: str = "global") -> list[Rule]:
         # One unreadable file must not take every other rule down with it (hooks, doctor and review all load
         # these). It comes back as an invalid rule, so active_rules() skips it and doctor reports it.
         try:
-            data = yaml.safe_load(f.read_text(encoding="utf-8")) or {}
+            data = load_yaml(f.read_text(encoding="utf-8")) or {}
         except (OSError, UnicodeDecodeError, yaml.YAMLError) as e:
             rules.append(_unreadable(f, origin, f"cannot read {f.name}: {type(e).__name__}: {e}"))
             continue
@@ -296,7 +297,7 @@ def load_project(root: Path | None) -> ProjectConfig:
     if not f.exists():
         return cfg
     try:
-        data = yaml.safe_load(f.read_text(encoding="utf-8")) or {}
+        data = load_yaml(f.read_text(encoding="utf-8")) or {}
     except yaml.YAMLError as e:
         cfg.problems.append(f"{PROJECT_FILE}: invalid YAML ({e})")
         return cfg
