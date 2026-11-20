@@ -1,0 +1,62 @@
+id: code-in-source-folders
+title: Keep code in folders (src/, frontend/, backend/...), not loose at the repo's top level
+severity: soft
+status: candidate
+applies_to:
+- '**'
+check:
+  kind: path-forbidden
+  paths:
+  - /*.py
+  - /*.ts
+  - /*.tsx
+  - /*.js
+  - /*.jsx
+  - /*.mjs
+  - /*.cjs
+  - /*.java
+  - /*.kt
+  - /*.go
+  - /*.rs
+  - /*.c
+  - /*.cc
+  - /*.cpp
+  - /*.h
+  - /*.hpp
+  - /*.cs
+  - /*.swift
+  - /*.rb
+  - /*.php
+  - /*.vue
+  - /*.svelte
+  - /*.dart
+  - /*.scala
+  allow:
+  - setup.py
+  - manage.py
+  - conftest.py
+  - noxfile.py
+  - fabfile.py
+  - '*.config.js'
+  - '*.config.ts'
+  - '*.config.mjs'
+  - '*.config.cjs'
+  - '*.config.mts'
+  - '*.d.ts'
+  - gulpfile.*
+  - Gruntfile.*
+  - .eslintrc.*
+  - .prettierrc.*
+  - build.rs
+  - Package.swift
+why: Projects whose code lives in src/, frontend/, backend/ or the language's usual folder are easier
+  for people and agents to navigate, and loose files at the top get copied and multiply.
+fix: 'Put the file in the folder it belongs to: src/, frontend/, backend/, app/, lib/, packages/, scripts/,
+  tests/ or the language''s usual one. Tool config files that must sit at the top (setup.py, vite.config.ts,
+  ...) are already allowed. If a tool needs another one there, ask the user to add it to this rule''s
+  allow list, or disable the rule in that repo''s .agent-guard.yaml with a reason.'
+source:
+  proposed_by: claude
+  proposed_at: '2026-11-20'
+  evidence: 'user: "add a rule, which is all the codebases must have, src, frontend, backend, etc." Chose:
+    warn when code is added loose at a repo''s top level instead of inside a folder.'
