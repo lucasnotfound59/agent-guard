@@ -169,3 +169,33 @@ def test_doctor_flags_wired_agents_that_never_sent_an_event(isolated):
     events.log("session_start", agent="claude")
     assert "Claude Code" not in quiet()
     assert not any("no hook events" in m for m in doctor.quick_issues())  # shown in doctor, not notified daily
+
+
+def test_probe_runs_each_agents_hook_command_into_a_throwaway_log(isolated, monkeypatch):
+    import json as _json
+
+    from agent_guard import adapters, install
+    from agent_guard.paths import guard_bin, log_file
+
+    (isolated / ".claude").mkdir()
+    (isolated / ".claude/settings.json").write_text("{}")
+    install.install()
+    res = doctor.probe()
+    assert any(lvl == "ok" and msg.startswith("Claude Code: its SessionStart hook runs agent-guard") for lvl, msg in res)
+    assert not log_file().exists() or "agent-guard-probe" not in log_file().read_text()  # the real log is untouched
+
+    original = guard_bin().read_text()
+    guard_bin().write_text("#!/bin/sh\necho 'runtime moved' >&2\nexit 3\n")
+    broken = [m for lvl, m in doctor.probe() if lvl == "fail" and m.startswith("Claude Code")]
+    assert broken and "exited 3: runtime moved" in broken[0]
+    guard_bin().write_text(original)
+
+    settings = isolated / ".claude/settings.json"
+    data = _json.loads(settings.read_text())
+    group = data["hooks"]["SessionStart"][-1]["hooks"][0]
+    group["command"] += " && touch " + str(isolated / "tampered")
+    settings.write_text(_json.dumps(data))
+    warned = [m for lvl, m in doctor.probe() if lvl == "warn" and m.startswith("Claude Code")]
+    assert warned and "isn't the one `guard install` writes" in warned[0]
+    assert not (isolated / "tampered").exists()  # a changed command is reported, never run
+    assert adapters.MARK in group["command"]

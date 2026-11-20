@@ -167,6 +167,8 @@ def _cmd_doctor(a: argparse.Namespace) -> int:
     from agent_guard import doctor
 
     res = doctor.results()
+    if a.probe:
+        res += doctor.probe()
     if a.json:
         print(json.dumps([{"level": lvl, "message": m} for lvl, m in res], indent=2))
     else:
@@ -285,6 +287,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     s = sub.add_parser("doctor", help="verify every agent is wired; find unwired agents")
     s.add_argument("--quick", action="store_true")
+    s.add_argument("--probe", action="store_true", help="also run each agent's hook command with a test event")
     s.add_argument("--json", action="store_true")
     s.set_defaults(fn=_cmd_doctor)
 

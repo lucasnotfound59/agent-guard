@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import subprocess
+import tempfile
+import time
 from pathlib import Path
 
 from agent_guard import adapters as ad
@@ -155,6 +158,92 @@ def results() -> list[tuple[str, str]]:
             found = ", ".join(bins + [contract(expand(d)) for d in dirs])
             add(("warn", f"unwired agent: {name} ({found}) — add adapters/{name}.yaml, then `guard install`"))
     return out
+
+
+# ------------------------------------------------------------------ probe
+
+PROBE_EVENT = {"claude-settings": "SessionStart", "codex-hooks": "SessionStart", "gemini-settings": "SessionStart",
+               "cursor-hooks": "sessionStart", "copilot-hooks": "sessionStart"}
+
+
+def _our_command(obj: object) -> str | None:
+    """The agent-guard hook command inside one event's hook groups, in any agent's layout."""
+    if isinstance(obj, dict):
+        for k in ("command", "bash"):
+            v = obj.get(k)
+            if isinstance(v, str) and ad.MARK in v:
+                return v
+        obj = list(obj.values())
+    if isinstance(obj, list):
+        for v in obj:
+            found = _our_command(v)
+            if found:
+                return found
+    return None
+
+
+def probe() -> list[tuple[str, str]]:
+    """Run each wired agent's session-start hook command the way the agent would, into a throwaway log.
+
+    Catches a hook that is configured but broken (moved runtime, bad Python, output the agent would reject). It
+    can't see whether the agent itself calls the hook; a session started in that agent shows that.
+    """
+    out: list[tuple[str, str]] = []
+    with tempfile.TemporaryDirectory(prefix="agent-guard-probe-") as tmp:
+        for a in ad.load_all():
+            if not a.detected() or ad.hooks_present(a) is not True:
+                continue
+            event = PROBE_EVENT.get(a.hooks_writer)
+            if event is None:
+                out.append(("info", f"{a.title}: agent-guard runs inside it as a plugin, which only starting "
+                                    f"{a.title} can check"))
+                continue
+            try:
+                configured = _our_command((ad._read_json(expand(a.hooks_file)).get("hooks") or {}).get(event))
+            except (OSError, json.JSONDecodeError) as e:
+                out.append(("fail", f"{a.title}: can't read {a.hooks_file}: {e}"))
+                continue
+            expected = _our_command(ad.hook_spec(a).get(event))
+            if not configured:
+                out.append(("fail", f"{a.title}: no agent-guard {event} hook in {a.hooks_file}; run `guard install`"))
+            elif configured != expected:
+                out.append(("warn", f"{a.title}: its {event} hook command isn't the one `guard install` writes, so "
+                                    "--probe won't run it; check it, then run `guard install`"))
+            else:
+                out.append(_run_probe(a, configured, event, Path(tmp) / a.name))
+    out.append(("info", "--probe ran each agent's own hook command. Whether the agent itself calls it shows once you "
+                        "start a session there: look for it in `guard report` or the dashboard's Health view"))
+    return out
+
+
+def _run_probe(a: ad.Adapter, command: str, event: str, state: Path) -> tuple[str, str]:
+    session = f"agent-guard-probe-{a.name}"
+    root = str(repo_root())
+    payload = {"hook_event_name": event, "session_id": session, "sessionId": session, "conversation_id": session,
+               "cwd": root, "workspace_roots": [root], "source": "startup"}
+    env = {**os.environ, "AGENT_GUARD_HOME": str(state), "AGENT_GUARD_NOTIFY": "0"}
+    started = time.perf_counter()
+    try:
+        r = subprocess.run(command, shell=True, input=json.dumps(payload), capture_output=True, text=True, env=env,
+                           cwd=root, timeout=30)
+    except subprocess.TimeoutExpired:
+        return ("fail", f"{a.title}: its {event} hook didn't answer within 30 s")
+    ms = round((time.perf_counter() - started) * 1000)
+    if r.returncode != 0:
+        last = ((r.stderr or r.stdout).strip().splitlines() or ["no output"])[-1]
+        return ("fail", f"{a.title}: its {event} hook exited {r.returncode}: {last[:200]}")
+    if r.stdout.strip():
+        try:
+            json.loads(r.stdout)
+        except json.JSONDecodeError:
+            return ("fail", f"{a.title}: its {event} hook printed something that isn't JSON, which {a.title} rejects")
+    try:
+        lines = (state / "log" / "events.jsonl").read_text(encoding="utf-8").splitlines()
+    except OSError:
+        lines = []
+    if not any('"session_start"' in ln and f'"agent": "{a.name}"' in ln for ln in lines):
+        return ("fail", f"{a.title}: its {event} hook ran, but agent-guard didn't record the session")
+    return ("ok", f"{a.title}: its {event} hook runs agent-guard and answers in {ms} ms")
 
 
 def _private_terms_status(rules: list) -> list[tuple[str, str]]:
