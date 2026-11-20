@@ -265,3 +265,25 @@ def test_toolbox_routes(home):
         assert status == 400
     finally:
         app.close()
+
+
+def test_read_only_dashboard_refuses_changes(home):
+    import threading
+
+    from agent_guard.dashboard import server
+    from tests.test_dashboard import call
+
+    app = server.Dashboard(port=0, read_only=True)
+    threading.Thread(target=app.serve_forever, daemon=True).start()
+    try:
+        assert call(app, "GET", "/api/version")[2]["readOnly"] is True
+        before = (home / ".codex/config.toml").read_text()
+        status, _, body = call(app, "POST", "/api/manage", body={"action": "plugin.toggle", "agent": "codex",
+                                                                 "id": "github@curated", "on": False,
+                                                                 "versions": toolbox.inventory()["versions"]})
+        assert status == 403 and body["error"]["code"] == "read_only"
+        assert (home / ".codex/config.toml").read_text() == before
+        assert call(app, "POST", "/api/check", body={"mode": "command", "text": "ls"})[0] == 200  # checks only read
+        assert call(app, "GET", "/api/toolbox")[0] == 200
+    finally:
+        app.close()

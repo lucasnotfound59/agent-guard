@@ -153,7 +153,7 @@ def _cmd_report(a: argparse.Namespace) -> int:
 def _cmd_dashboard(a: argparse.Namespace) -> int:
     from agent_guard.dashboard import server
 
-    return server.serve(port=a.port, open_browser=not a.no_browser)
+    return server.serve(port=a.port, open_browser=not a.no_browser, read_only=a.read_only)
 
 
 def _cmd_scan(a: argparse.Namespace) -> int:
@@ -274,6 +274,8 @@ def build_parser() -> argparse.ArgumentParser:
     s = sub.add_parser("dashboard", help="local web dashboard: warnings, rules, proposals, checks and health")
     s.add_argument("--port", type=int, default=0, help="port on 127.0.0.1 (default: any free port)")
     s.add_argument("--no-browser", action="store_true", help="print the link instead of opening a browser")
+    s.add_argument("--read-only", action="store_true",
+                   help="the Toolbox can't change anything (e.g. when an agent starts the dashboard for you)")
     s.set_defaults(fn=_cmd_dashboard)
 
     s = sub.add_parser("scan", help="existing bad patterns in a repo that agents may copy")

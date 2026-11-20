@@ -106,6 +106,7 @@
 
         <section id="view-toolbox" class="view" hidden>
           <div class="page-heading"><div><div class="eyebrow">SKILLS / MCP / PLUGINS</div><h1>Toolbox</h1><p>Every agent's skills, MCP servers and plugins in one place, plus the AGENTS.md they all read. Each change backs up the file first and shows in Activity.</p></div></div>
+          <p id="toolbox-readonly" class="notice warning" hidden>Started with <code>--read-only</code>: you can look, but nothing can be changed here. Run <code>guard dashboard</code> without it to make changes.</p>
           <div class="tabs" role="tablist" aria-label="Toolbox sections">
             <button role="tab" class="tab active" data-tab="mcp" aria-selected="true">MCP servers <b id="count-mcp"></b></button>
             <button role="tab" class="tab" data-tab="skills" aria-selected="false">Skills <b id="count-skills"></b></button>
@@ -113,7 +114,7 @@
             <button role="tab" class="tab" data-tab="agentsmd" aria-selected="false">AGENTS.md</button>
           </div>
           <div id="tab-mcp" class="tab-panel">
-            <section class="panel"><div class="panel-heading"><div><h2>Servers by agent</h2><p class="muted small">Pick a server to switch it on or off per agent, copy it to agents that lack it, or remove it. Secret values stay on the server; you see their names only.</p></div><button id="mcp-add-open" class="button primary">＋ Add server</button></div><div id="mcp-errors"></div><div id="mcp-matrix" class="table-wrap"></div></section>
+            <section class="panel"><div class="panel-heading"><div><h2>Servers by agent</h2><p class="muted small">Pick a server to switch it on or off per agent, copy it to agents that lack it, or remove it. Secret values stay on the server; you see their names only.</p></div><button id="mcp-add-open" class="button primary write">＋ Add server</button></div><div id="mcp-errors"></div><div id="mcp-matrix" class="table-wrap"></div></section>
             <section id="mcp-detail" class="panel detail-panel static" hidden></section>
           </div>
           <div id="tab-skills" class="tab-panel" hidden>
@@ -129,7 +130,7 @@
           <div id="tab-agentsmd" class="tab-panel" hidden>
             <section class="panel context-panel"><div class="panel-heading"><div><h2>Global AGENTS.md</h2><p id="agentsmd-info" class="muted small"></p></div><span id="agentsmd-lines" class="badge"></span></div>
               <form id="agentsmd-form"><textarea id="agentsmd-text" class="code-editor tall" spellcheck="false" aria-label="AGENTS.md text"></textarea>
-                <div class="form-footer"><span id="agentsmd-status" class="muted small" aria-live="polite"></span><span class="badge-row"><button id="agentsmd-reload" type="button" class="button">Reload</button><button id="agentsmd-save" type="submit" class="button primary" disabled>Save</button></span></div></form>
+                <div class="form-footer"><span id="agentsmd-status" class="muted small" aria-live="polite"></span><span class="badge-row"><button id="agentsmd-reload" type="button" class="button">Reload</button><button id="agentsmd-save" type="submit" class="button primary write" disabled>Save</button></span></div></form>
             </section>
           </div>
         </section>

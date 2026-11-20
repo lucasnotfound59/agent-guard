@@ -155,6 +155,14 @@
       : 'Lost the connection to the dashboard server. Showing the last data; restart `guard dashboard` if it stopped.';
     alert.hidden = false;
   }
+  function setReadOnly(on) {
+    if (state.readOnly === on) return;
+    state.readOnly = on;
+    document.body.classList.toggle('read-only', on);
+    $('toolbox-readonly').hidden = !on;
+    $('agentsmd-text').readOnly = on;
+    if (state.toolbox) renderToolbox();
+  }
   function markRefreshed() { $('last-refresh').textContent = 'updated ' + new Date().toLocaleTimeString(undefined, {hour12: false}); }
   function setPending(n) {
     const b = $('proposal-count');
@@ -210,6 +218,7 @@
       const v = await api('version');
       setPending(v.pending);
       $('log-path').textContent = v.logPath + ' · ' + fmtNum(v.logRecords) + ' records';
+      setReadOnly(!!v.readOnly);
       const changed = v.version !== state.version;
       state.version = v.version;
       if (changed || force) await loadView(state.view, true);
@@ -673,6 +682,7 @@
     }
   }
   function stateChip(label, cls, onClick, title) {
+    if (state.readOnly) onClick = null;
     const chip = el(onClick ? 'button' : 'span', 'state ' + cls, label);
     if (title) chip.title = title;
     if (onClick) { chip.type = 'button'; chip.onclick = e => { e.stopPropagation(); onClick(); }; }
@@ -752,7 +762,7 @@
       toggle.onclick = () => act({action: 'mcp.toggle', name: srv.name, agent: a.name, on: st !== 'on'});
       const remove = el('button', 'button small', 'Remove');
       remove.onclick = () => act({action: 'mcp.remove', name: srv.name, agent: a.name}, 'Remove ' + srv.name + ' from ' + a.title + '? Its config file is backed up first.');
-      return append(el('div', 'agent-row'), append(el('span'), el('strong', '', a.title), el('div', 'muted small mono', a.path)), stateChip(st, st), append(el('span', 'badge-row'), toggle, remove));
+      return append(el('div', 'agent-row'), append(el('span'), el('strong', '', a.title), el('div', 'muted small mono', a.path)), stateChip(st, st), append(el('span', 'badge-row write'), toggle, remove));
     })));
     if (lack.length) {
       const picks = append(el('div', 'check-list'), lack.map(a => { const c = el('input'); c.type = 'checkbox'; c.value = a.name; return append(el('label'), c, a.title); }));
@@ -765,7 +775,7 @@
         if (!agents.length) return toast('Tick at least one agent.', true);
         act({action: 'mcp.copy', name: srv.name, source: source.value, agents});
       };
-      body.append(section('Copy to other agents', picks, append(el('div', 'form-footer'), append(el('label', 'window-picker'), 'from ', source), go),
+      if (!state.readOnly) body.append(section('Copy to other agents', picks, append(el('div', 'form-footer'), append(el('label', 'window-picker'), 'from ', source), go),
         el('p', 'muted small', 'The definition, including secret values, is copied on the server and converted to each agent\'s format. Settings only one agent understands (timeouts, trust) are left out.')));
     }
     fill(box, head, body);
@@ -845,7 +855,8 @@
       const edit = el('button', 'button small', 'Edit'); edit.onclick = () => openSkillEditor(u.name, u.agent);
       const remove = el('button', 'button small', 'Remove');
       remove.onclick = () => act({action: 'skill.remove', name: u.name, agent: u.agent}, 'Remove ' + u.name + ' from ' + titleOf(u.agent) + '? The folder is backed up first.');
-      return append(el('div', 'plugin-row'), append(el('span'), el('strong', 'mono', u.name), el('div', 'muted small', titleOf(u.agent) + ' · ' + u.path)), el('span', 'muted small', u.description.slice(0, 80)), share, append(el('span', 'badge-row'), edit, remove));
+      share.classList.add('write');
+      return append(el('div', 'plugin-row'), append(el('span'), el('strong', 'mono', u.name), el('div', 'muted small', titleOf(u.agent) + ' · ' + u.path)), el('span', 'muted small', u.description.slice(0, 80)), share, append(el('span', 'badge-row write'), edit, remove));
     }) : el('p', 'empty-state', 'Every skill is shared. Nothing is stuck in one agent.'));
   }
   function renderSkillDetail() {
@@ -866,7 +877,7 @@
       remove.onclick = () => act({action: 'skill.remove', name: s.name}, 'Remove ' + s.name + ' for every agent?' + (s.kind === 'own' ? ' This deletes its folder in the repo\'s skills/ (git can bring it back).' : '') + ' A backup is kept.');
       actions.append(all, remove);
     }
-    body.append(section('Change', actions));
+    if (!state.readOnly) body.append(section('Change', actions));
     fill(box, head, body);
   }
   async function openSkillEditor(name, agent) {
@@ -905,7 +916,7 @@
       groups[agent].map(x => {
         const st = x.enabled === null ? 'n/a' : x.enabled ? 'on' : 'off';
         const toggle = x.canToggle ? stateChip(st, st, () => act({action: 'plugin.toggle', agent, id: x.id, on: !x.enabled}), 'Switch ' + (x.enabled ? 'off' : 'on')) : stateChip(st, x.enabled === null ? 'pool' : st);
-        const remove = el('button', 'button small', 'Remove');
+        const remove = el('button', 'button small write', 'Remove');
         remove.hidden = !x.canRemove;
         remove.onclick = () => act({action: 'plugin.remove', agent, id: x.id}, 'Remove ' + x.id + ' from ' + titleOf(agent) + '? A backup is kept.');
         return append(el('div', 'plugin-row'), el('span', 'mono', x.id), x.locked ? badge('agent-guard\'s own', 'info') : badge(x.kind, 'outline'), toggle, remove);

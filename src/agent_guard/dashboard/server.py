@@ -70,7 +70,8 @@ def _int(value: str | None, default: int) -> int:
 class Dashboard:
     """State shared by every request: the token, the caches, and the bound socket."""
 
-    def __init__(self, port: int = 0):
+    def __init__(self, port: int = 0, read_only: bool = False):
+        self.read_only = read_only
         self.token = token_source.token_urlsafe(32)
         self.log = data.LogCache()
         self.health = data.HealthCache()
@@ -100,7 +101,7 @@ class Dashboard:
         window = q.get("window", "7d")
         if path == "/api/version":
             return {"pending": len(global_rules("candidate")), "logPath": contract(log_file()),
-                    "logRecords": len(self.log.records())}
+                    "logRecords": len(self.log.records()), "readOnly": self.read_only}
         if path == "/api/overview":
             return data.overview(self.log, window)
         if path == "/api/rules":
@@ -126,6 +127,9 @@ class Dashboard:
         if path == "/api/dry-run":
             return data.dry_run(str(body.get("id") or ""))
         if path == "/api/manage":
+            if self.read_only:
+                raise Problem(403, "read_only", "This dashboard was started with --read-only, so the Toolbox can't "
+                                                "change anything. Start `guard dashboard` without it to make changes.")
             return toolbox.manage(body)
         raise Problem(404, "not_found", "Unknown dashboard route")
 
@@ -283,15 +287,20 @@ def _handler(app: Dashboard) -> type[BaseHTTPRequestHandler]:
     return Handler
 
 
-def serve(port: int = 0, open_browser: bool = True) -> int:
+def serve(port: int = 0, open_browser: bool = True, read_only: bool = False) -> int:
     try:
-        app = Dashboard(port)
+        app = Dashboard(port, read_only=read_only)
     except (OSError, OverflowError) as e:
         print(f"guard dashboard: cannot listen on 127.0.0.1:{port}: {e}", file=sys.stderr)
         return 1
     print(f"agent-guard dashboard: {app.url}")
-    print("The Toolbox can change agent configs, skills and AGENTS.md (each change backed up and logged); rules "
-          "can't change here. The link holds this run's token, so keep it to yourself. Ctrl+C stops it.", flush=True)
+    if read_only:
+        print("Read-only: nothing can be changed from this dashboard. The link holds this run's token, so keep it "
+              "to yourself. Ctrl+C stops it.", flush=True)
+    else:
+        print("The Toolbox can change agent configs, skills and AGENTS.md (each change backed up and logged); rules "
+              "can't change here. Use --read-only to turn that off. The link holds this run's token, so keep it to "
+              "yourself. Ctrl+C stops it.", flush=True)
     if open_browser and not webbrowser.open(app.url):
         print("Couldn't open a browser; open the link above yourself.", flush=True)
     try:
