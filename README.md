@@ -44,12 +44,32 @@ you edited since. `guard uninstall --purge` also deletes the runtime, logs and b
 
 | Command | What it does |
 | --- | --- |
-| `guard report --since 7d` | Which rules each agent breaks most, across all repos. This is how you spot bad habits |
+| `guard dashboard` | Local web dashboard: warnings over time, habits, rules and what each caught, the full event log, proposals with a dry-run, a rule tester, and doctor. Read-only |
+| `guard report --since 7d` | Which rules each agent breaks most, across all repos (`--since all`, `--json` for scripts). This is how you spot bad habits |
 | `guard review` | Approve, edit or reject rules that agents proposed (needs a terminal, so agents can't approve their own) |
 | `guard scan <repo>` | Bad patterns already in a repo that agents will copy |
 | `guard rules` | Rules that apply in the current repo |
 | `guard check [--staged]` | Check uncommitted changes now |
 | `guard doctor` | Health check: every agent wired, rules valid, agents installed since the last install, and repos whose own `core.hooksPath` skips the global git hooks |
+
+## Dashboard
+
+`guard dashboard` serves a page on `127.0.0.1` (any free port, or `--port`) and opens it (`--no-browser` just
+prints the link). It reads the event log, the rule files, git and `guard doctor`, and changes nothing:
+
+- **Overview**: warnings per hour/day, top rules, agents, repos, and agent × rule habits, with alerts for hook
+  errors, invalid rule files and waiting proposals.
+- **Rules**: every active, proposed and retired rule with its check, what it caught in the window, and an optional
+  repo overlay (what that repo's `.agent-guard.yaml` disables, excludes and adds).
+- **Activity**: the whole log with filters and search. **Check**: run the rules on a repo's uncommitted or staged
+  changes, a diff, a command or a commit message, like `guard check`. **Health**: doctor, plus when each agent last
+  sent a hook event.
+- **Proposals**: the evidence, a dry-run against your repos, and the commands to approve or reject. Approving stays
+  in your terminal (`guard review`), so an agent with a browser can't approve its own rule.
+
+The link carries a fresh token in its `#fragment`; the page keeps it in memory only. The server answers only
+requests with that token, the exact `127.0.0.1:<port>` Host and no foreign Origin. Ported from FTC Knowledge
+Bank's rule dashboard.
 
 ## Rules
 
@@ -90,7 +110,7 @@ global/AGENTS.md     the one global instruction file
 rules/               active/ (approved), candidates/ (proposed), retired/
 adapters/            one YAML per agent: instructions, skills, hooks
 skills/              your own skills, shared to every agent
-src/agent_guard/     engine (Python, PyYAML only); hookio/ has one module per hook dialect
+src/agent_guard/     engine (Python, PyYAML only); hookio/ has one module per hook dialect; dashboard/ is the web UI
 git-hooks/           the global git hook dispatcher
 templates/           OpenCode plugin
 tests/               pytest; tests never touch your real home, state or git config
@@ -100,6 +120,8 @@ Limits:
 - Agents without hook support (Antigravity, Qwen Code, Trae, Qoder, and DSH until its experimental
   `@deepseek-ai/dsh-hooks-claude-code` plugin is installed) get the rules and skills but are only checked at
   commit time.
+- Commits in repos matching `ignore_repos` in `config.yaml` (by default pytest's `pytest-of-*` temp folders, where
+  other projects' test suites commit) are not checked, logged or notified.
 - A repo with its own local `core.hooksPath` (for example husky) skips the global git hooks. `guard doctor` lists
   these repos and the two lines to add to their hooks.
 - Command rules match the command's text, so a command that only mentions a pattern (for example as an argument

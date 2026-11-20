@@ -1,5 +1,26 @@
 # Changelog
 
+## Unreleased
+
+**Dashboard**
+- `guard dashboard`: a local, read-only web view of the event log, rules, proposals and health, ported from FTC
+  Knowledge Bank's rule dashboard (loopback only, one-time token, Host/Origin checks, live updates, light and dark).
+  It can dry-run proposals and test rules on a repo, diff, command or commit message. Approving stays in
+  `guard review`.
+- `guard report --json` and `guard report --since all`.
+
+**Fixes**
+- Commits in other projects' test-suite repos (`pytest-of-*` temp folders) no longer reach the log or notifications.
+  They were most of all logged warnings. Configurable with `ignore_repos`.
+- Repo discovery (`guard doctor`, the proposal dry-run) stops at `node_modules`, `.worktrees` and each `.git`, and a
+  scan that hits its 30 s timeout keeps what it found instead of silently returning no repos. Doctor says when
+  that happens.
+- Hooks for parallel tool calls no longer lose or corrupt each other's session state (merged under a lock and
+  written atomically), so warnings aren't repeated.
+- One unreadable rule file (bad YAML, not a mapping) no longer breaks every hook, `guard doctor` and `guard review`;
+  it is skipped and reported as invalid.
+- The log keeps 5 rotated files instead of growing forever, and `guard report` and doctor read the rotated ones too.
+
 ## 1.0.0 — 2026-11-20
 
 First complete version: one warn-only rulebook for every AI coding agent on this Mac.
