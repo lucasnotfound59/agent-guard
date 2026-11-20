@@ -121,3 +121,31 @@ def test_garbage_input_never_breaks_the_agent(fmt):
     out = hooks.run("x", fmt, "auto", "{not json")
     assert out == hookio.get(fmt).neutral("auto")
     assert any(r["event"] == "hook_error" for r in read_log())
+
+
+def _start(agent, fmt, repo, session, source):
+    payload = {"hook_event_name": "SessionStart", "session_id": session, "cwd": str(repo), "source": source}
+    out = json.loads(hooks.run(agent, fmt, "auto", json.dumps(payload)))
+    return out["hookSpecificOutput"]["additionalContext"]
+
+
+def test_session_start_text_is_framed_as_background(repo):
+    text = _start("claude", "claude", repo, "bg1", "startup")
+    assert "Hard:" in text and "not a request" in text and text.rstrip().endswith("latest request.")
+
+
+def test_resume_gets_a_short_reminder_instead_of_the_full_list(repo):
+    first = _start("codex", "codex", repo, "thread-1", "startup")
+    again = _start("codex", "codex", repo, "thread-1", "resume")
+    assert "Hard:" in first
+    assert "Hard:" not in again and "still active" in again and "not a request" in again
+    assert [r.get("source") for r in read_log() if r["event"] == "session_start"] == [None, "resume"]
+
+
+def test_resume_repeats_the_rules_when_it_has_no_record_or_they_changed(repo):
+    assert "Hard:" in _start("codex", "codex", repo, "never-started-here", "resume")
+    _start("claude", "claude", repo, "s-change", "startup")
+    (repo / ".agent-guard.yaml").write_text("disable:\n  - id: no-ts-any\n    reason: generated code\n")
+    changed = _start("claude", "claude", repo, "s-change", "resume")
+    assert "Hard:" in changed and "Disabled here: no-ts-any" in changed
+    assert "Hard:" in _start("claude", "claude", repo, "s-change", "compact")  # context was summarised

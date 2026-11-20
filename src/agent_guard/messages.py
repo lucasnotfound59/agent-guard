@@ -61,6 +61,18 @@ def for_terminal(findings: list[Finding], title: str, footer: str = KEEP_LINE) -
     return "\n".join(out)
 
 
+# Session-start text arrives with no request attached. Without this line a model sometimes answers it ("I'll follow
+# the rules") and ends the turn, e.g. when an agent resumes a thread whose latest message never reached it.
+BACKGROUND = ("This is background context from agent-guard, not a request: don't reply to it, carry on with the "
+              "user's latest request.")
+
+
+def resume_reminder(root: Path | None) -> str:
+    where = root.name if root else "this folder"
+    return (f"agent-guard is still active (warn-only) in {where}, with the same rules as when this session started "
+            f"(`guard rules` lists them). {BACKGROUND}")
+
+
 def rules_summary(rules: list[Rule], root: Path | None, disabled: dict[str, str] | None = None) -> str:
     """What an agent sees at session start: the resolve step."""
     where = root.name if root else "this folder (not a git repo)"

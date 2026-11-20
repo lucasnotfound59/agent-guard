@@ -86,12 +86,20 @@ def handle(agent: str, fmt: str, inp: HookInput) -> HookOutput:
 
 def _session_start(ctx: _Ctx) -> HookOutput:
     rules, project = ctx.rules_for(ctx.cwd)
+    source = str(ctx.inp.raw.get("source") or "startup").lower()  # startup | resume | clear | compact
     events.log("session_start", agent=ctx.agent, cwd=ctx.cwd, session=ctx.inp.session_id or None,
-               repo=str(project.root) if project.root else None, rules=len(rules))
+               repo=str(project.root) if project.root else None, rules=len(rules),
+               source=source if source != "startup" else None)
+    signature = sorted(r.id for r in rules)
+    if source == "resume" and ctx.state.data.get("rules_sent") == signature and not project.problems:
+        # The resumed thread already holds the full list from when it started; repeating it gives the model one
+        # more thing to answer instead of the user's task.
+        return HookOutput(agent_text=messages.resume_reminder(project.root))
+    ctx.state.data["rules_sent"] = signature
     text = messages.rules_summary(rules, project.root, project.disabled)
     if project.problems:
         text += "\nagent-guard config problems in this repo: " + "; ".join(project.problems)
-    return HookOutput(agent_text=text)
+    return HookOutput(agent_text=text + "\n" + messages.BACKGROUND)
 
 
 def _pre_command(ctx: _Ctx) -> HookOutput:

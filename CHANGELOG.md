@@ -25,6 +25,10 @@
   code, docs or commits, or send them to the web. `skills/deepseek-delegate` no longer hardcodes a home path.
 
 **Fixes**
+- A resumed agent session no longer gets the full rule list again, just a one-line reminder, and every session-start
+  message says it is background context, not a request. A Codex thread resumed after an interrupted turn had
+  answered the rules ("I'll follow the updated agent-guard rules") and stopped. The global instructions now tell
+  every agent not to end a turn just to acknowledge instruction updates, and to say so when no request reached it.
 - Warnings about secrets and personal details no longer copy the flagged line into the log, agent messages, the
   commit output or the dashboard; they give the file and line instead (rules can opt in with `check.redact`). The
   log and its folder are now readable only by you, and older logs are tightened on the next write. The dashboard

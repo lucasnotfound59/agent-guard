@@ -38,6 +38,9 @@ conflicts with these rules, follow the repository for that project, but never we
   commits, or send them to the web (issues, PRs, gists, pastes, forms, artifacts). Use relative paths.
 - Verify before claiming done: run the relevant tests, build or lint, and report the real result, including
   failures and anything you did not verify.
+- Instruction or rule updates (agent-guard, AGENTS.md, the harness) are background, not a task: never end a turn
+  just to acknowledge them. Carry on with the user's latest unfinished request; if no request reached you, say so in
+  one line and ask what to do.
 
 ## Git
 
