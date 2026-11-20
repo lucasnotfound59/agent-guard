@@ -7,7 +7,7 @@ description: Delegate the current user-authorized Git coding task to local DeepS
 
 Use this skill only for the current task. Its presence does not authorize automatic delegation of future projects. DSH sends the task prompt and any files it reads to the configured DeepSeek provider, so keep the scope to what the user requested and exclude unrelated private data.
 
-The local controller is `~/Documents/LLM/codex-dsh-delegate/bin/codex-dsh-delegate`. Read its [README](~/Documents/LLM/codex-dsh-delegate/README.md) when you need the command contract or recovery details. It uses DSH ACP with `deepseek-flash` and `max`, keeps one session per task, and edits an isolated Git worktree. It does not add DSH to Codex's native subagent list.
+The local controller is `~/Documents/LLM/codex-dsh-delegate/bin/codex-dsh-delegate`. Read its README (`~/Documents/LLM/codex-dsh-delegate/README.md`) when you need the command contract or recovery details. It uses DSH ACP with `deepseek-flash` and `max`, keeps one session per task, and edits an isolated Git worktree. It does not add DSH to Codex's native subagent list.
 
 ## Delegate and review
 

@@ -101,6 +101,12 @@ fix: Use a path relative to the project, an environment variable, or Path.home()
 - **Keep a flagged line on purpose:** add `agent-guard: allow <rule-id> <reason>` on that line. It's logged as kept, with the reason.
 - **Per-repo overlay:** `.agent-guard.yaml` at a repo root can add `rules:`, `exclude_paths:`, commit-time
   `checks:`, and `disable:` entries. Each disable needs an `id` and a `reason`.
+- **Private terms:** a rule with `check.private_terms: true` also matches every line of
+  `~/.agent-guard/private-terms.txt`: your real name, usernames and private e-mail addresses, one per line (`#` for
+  comments). The file is never committed, so rules can catch personal details without publishing them. Create it
+  yourself and `chmod 600` it; `guard doctor` warns when a rule needs it and it is missing or readable by others.
+  Names match case-insensitively, across separators and as whole words (`Jane Doe` also catches `jane_doe`,
+  `JaneDoeClient` and `/Users/janedoe/`, but not `janedoes`).
 - **Learning loop:** agents run `guard propose ...` when you correct a general habit. That writes
   `rules/candidates/<id>.yaml`, which is not active. `guard review` shows how often the rule would have matched in
   your repos, and approving it commits `feat(rules): add <id>` here.

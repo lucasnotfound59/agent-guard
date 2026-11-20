@@ -33,8 +33,9 @@ conflicts with these rules, follow the repository for that project, but never we
   can't be finished, say exactly what is missing.
 - Don't silence errors (empty catch, `except: pass`) or checkers (`@ts-ignore`, `eslint-disable`, `# noqa`)
   to get green. Don't skip, delete or weaken tests to make them pass.
-- No secrets in code or commits; never commit `.env`, keys, or `local.properties`. No absolute paths like
-  `/Users/<name>/` in code.
+- No secrets in code or commits; never commit `.env`, keys, or `local.properties`.
+- Never put the user's keys, real name, username, private e-mail addresses or absolute paths in code, docs or
+  commits, or send them to the web (issues, PRs, gists, pastes, forms, artifacts). Use relative paths.
 - Verify before claiming done: run the relevant tests, build or lint, and report the real result, including
   failures and anything you did not verify.
 

@@ -14,6 +14,16 @@
   `guard install` respects skills switched off there (`~/.agent-guard/overrides.json`).
 - `guard report --json` and `guard report --since all`.
 
+**Personal details**
+- Private terms: rules with `check.private_terms: true` also match the lines of `~/.agent-guard/private-terms.txt`
+  (your real name, usernames, private e-mails), which is never committed. `guard doctor` warns when it is missing,
+  empty or readable by others.
+- `guard propose` gains `--allow-pattern` (repeatable) and `--private-terms`.
+- Proposed (not active until approved): `no-personal-info` (private terms and non-placeholder e-mail addresses)
+  and `relative-paths-only` (macOS temp and `/private` folders, mounted volumes, Windows and WSL user folders).
+- The global instructions now tell every agent not to put your keys, name, private e-mails or absolute paths in
+  code, docs or commits, or send them to the web. `skills/deepseek-delegate` no longer hardcodes a home path.
+
 **Fixes**
 - Commits in other projects' test-suite repos (`pytest-of-*` temp folders) no longer reach the log or notifications.
   They were most of all logged warnings. Configurable with `ignore_repos`.
