@@ -24,6 +24,17 @@
 - The global instructions now tell every agent not to put your keys, name, private e-mails or absolute paths in
   code, docs or commits, or send them to the web. `skills/deepseek-delegate` no longer hardcodes a home path.
 
+**Doctor, dashboard, rules**
+- `guard doctor --probe` runs each wired agent's session-start hook command exactly as the agent would, into a
+  throwaway log, and reports whether agent-guard answered, how fast, and with output the agent accepts. It refuses to
+  run a hook command that differs from what `guard install` writes.
+- `guard dashboard --read-only`: the Toolbox shows everything but changes nothing (the server refuses with 403).
+- Hooks parse the rule files with libyaml's C loader when it is installed, about 7 ms faster per hook.
+- Path globs accept a leading `/` to anchor to the repo root, like `.gitignore`. `guard propose` gains `--allow-paths`
+  for `path-forbidden` rules.
+- Proposed (not active until approved): `code-in-source-folders`, a soft rule that warns when code is added loose at a
+  repo's top level instead of in src/, frontend/, backend/ or another folder; top-level tool config files are allowed.
+
 **Fixes**
 - A resumed agent session no longer gets the full rule list again, just a one-line reminder, and every session-start
   message says it is background context, not a request. A Codex thread resumed after an interrupted turn had

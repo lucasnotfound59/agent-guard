@@ -44,13 +44,13 @@ you edited since. `guard uninstall --purge` also deletes the runtime, logs and b
 
 | Command | What it does |
 | --- | --- |
-| `guard dashboard` | Local web dashboard: warnings over time, habits, rules and what each caught, the full event log, proposals with a dry-run, a rule tester, doctor, and a Toolbox for every agent's skills, MCP servers, plugins and AGENTS.md |
+| `guard dashboard` | Local web dashboard: warnings over time, habits, rules and what each caught, the full event log, proposals with a dry-run, a rule tester, doctor, and a Toolbox for every agent's skills, MCP servers, plugins and AGENTS.md (`--read-only` turns changes off) |
 | `guard report --since 7d` | Which rules each agent breaks most, across all repos (`--since all`, `--json` for scripts). This is how you spot bad habits |
 | `guard review` | Approve, edit or reject rules that agents proposed (needs a terminal, so agents can't approve their own) |
 | `guard scan <repo>` | Bad patterns already in a repo that agents will copy |
 | `guard rules` | Rules that apply in the current repo |
 | `guard check [--staged]` | Check uncommitted changes now |
-| `guard doctor` | Health check: every agent wired, rules valid, agents installed since the last install, and repos whose own `core.hooksPath` skips the global git hooks |
+| `guard doctor` | Health check: every agent wired, rules valid, agents installed since the last install, and repos whose own `core.hooksPath` skips the global git hooks. `--probe` also runs each agent's hook command with a test event, into a throwaway log |
 
 ## Dashboard
 
@@ -78,7 +78,8 @@ prints the link). It reads the event log, the rule files, git and `guard doctor`
 The link carries a fresh token in its `#fragment`; the page keeps it in memory only. The server answers only
 requests with that token, the exact `127.0.0.1:<port>` Host and no foreign Origin, and changes need its own
 Origin. Anyone holding the link can use the Toolbox, including an agent that started the dashboard, so keep the
-link to yourself. Ported from FTC Knowledge Bank's rule dashboard.
+link to yourself, or start it with `guard dashboard --read-only`, which refuses every change. Ported from FTC
+Knowledge Bank's rule dashboard.
 
 ## Rules
 
@@ -102,6 +103,9 @@ fix: Use a path relative to the project, an environment variable, or Path.home()
 - **Hidden lines:** warnings from `no-secrets`, from rules that use private terms, and from rules with
   `check.redact: true` (or `redact: secret`) name the file and line but never repeat the line itself: not in the log,
   not in agent messages, not in the dashboard. The log (`~/.agent-guard/log/`) is readable only by you.
+- **Paths:** globs work like `.gitignore`: `*.py` matches a file name anywhere, `src/**` a folder, and a leading
+  `/` anchors to the repo root (`/*.py` is a top-level `.py` file, not one in `src/`). A `path-forbidden` rule can list
+  files it lets through under `check.allow`.
 - **Per-repo overlay:** `.agent-guard.yaml` at a repo root can add `rules:`, `exclude_paths:`, commit-time
   `checks:`, and `disable:` entries. Each disable needs an `id` and a `reason`.
 - **Private terms:** a rule with `check.private_terms: true` also matches every line of
