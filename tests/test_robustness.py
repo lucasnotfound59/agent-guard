@@ -1,10 +1,11 @@
 """Hardening found while building the dashboard: rotated logs, concurrent hook state, unreadable rule files."""
 
+import json
 import shutil
 
 import pytest
 
-from agent_guard import cli, config, doctor, events
+from agent_guard import cli, config, doctor, events, report
 from agent_guard.paths import log_file, repo_root
 from agent_guard.rules import active_rules, global_rules, validate
 
@@ -97,6 +98,18 @@ def test_one_unreadable_rule_file_does_not_disable_the_others(reg, repo):
     assert "not a rule" in validate(next(r for r in global_rules("candidate") if r.id == "listy"))[0]
     assert any(lvl == "fail" and "broken" in msg for lvl, msg in doctor.results())
     assert cli.main(["rules", "--candidates"]) == 0
+
+
+# ------------------------------------------------------------------ report
+
+
+def test_report_json_and_all_time(capsys):
+    events.log("finding", agent="codex", rule="no-ts-any", severity="soft", repo="/w/app", kind="edit")
+    assert report.parse_since("all") is None
+    assert cli.main(["report", "--since", "all", "--json"]) == 0
+    out = json.loads(capsys.readouterr().out)
+    assert out["since"] == "all" and out["warnings"] == 1 and out["by_repo"][0]["label"] == "app"
+    assert "all time" in report.report("all")
 
 
 # ------------------------------------------------------------------ repo discovery and test-suite repos

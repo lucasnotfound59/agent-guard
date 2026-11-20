@@ -142,11 +142,17 @@ def _cmd_report(a: argparse.Namespace) -> int:
     from agent_guard import report
 
     try:
-        print(report.report(a.since))
+        print(report.report(a.since, as_json=a.json))
     except ValueError as e:
         print(f"guard report: --since {a.since!r}: {e}", file=sys.stderr)
         return 2
     return 0
+
+
+def _cmd_dashboard(a: argparse.Namespace) -> int:
+    from agent_guard.dashboard import server
+
+    return server.serve(port=a.port, open_browser=not a.no_browser)
 
 
 def _cmd_scan(a: argparse.Namespace) -> int:
@@ -257,8 +263,14 @@ def build_parser() -> argparse.ArgumentParser:
     s.set_defaults(fn=_cmd_reject)
 
     s = sub.add_parser("report", help="which rules each agent breaks most, machine-wide")
-    s.add_argument("--since", default="7d")
+    s.add_argument("--since", default="7d", help="24h, 7d, 4w, ... or all")
+    s.add_argument("--json", action="store_true")
     s.set_defaults(fn=_cmd_report)
+
+    s = sub.add_parser("dashboard", help="local web dashboard: warnings, rules, proposals, checks and health")
+    s.add_argument("--port", type=int, default=0, help="port on 127.0.0.1 (default: any free port)")
+    s.add_argument("--no-browser", action="store_true", help="print the link instead of opening a browser")
+    s.set_defaults(fn=_cmd_dashboard)
 
     s = sub.add_parser("scan", help="existing bad patterns in a repo that agents may copy")
     s.add_argument("path", nargs="?", default=".")

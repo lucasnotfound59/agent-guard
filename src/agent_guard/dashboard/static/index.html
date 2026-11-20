@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
+  <title>agent-guard dashboard</title>
+  <link rel="stylesheet" href="/styles.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <div class="shell">
+    <aside class="sidebar" aria-label="Main navigation">
+      <a class="brand" href="#overview"><span class="brand-mark" aria-hidden="true">g<span>›</span></span><span>agent-<b>guard</b><small>DASHBOARD</small></span></a>
+      <div class="nav-label">WORKSPACE</div>
+      <nav id="navigation">
+        <button data-view="overview" class="nav-button active" aria-current="page"><span aria-hidden="true">◫</span>Overview</button>
+        <button data-view="rules" class="nav-button"><span aria-hidden="true">≡</span>Rules</button>
+        <button data-view="activity" class="nav-button"><span aria-hidden="true">↳</span>Activity</button>
+        <button data-view="proposals" class="nav-button"><span aria-hidden="true">✎</span>Proposals<b id="proposal-count" class="nav-count" hidden></b></button>
+        <button data-view="check" class="nav-button"><span aria-hidden="true">✓</span>Check</button>
+        <button data-view="health" class="nav-button"><span aria-hidden="true">♥</span>Health</button>
+      </nav>
+      <div class="sidebar-bottom"><div class="local-marker"><i></i> LOCAL / 127.0.0.1</div><p>Warn-only: nothing is blocked.<br>Read-only: approvals stay in your terminal.</p><small>Patterns catch text, not intent</small></div>
+    </aside>
+    <div class="workspace">
+      <header class="topbar">
+        <div class="root-block"><span class="eyebrow">EVENT LOG</span><span id="log-path" class="mono root-path">Connecting…</span></div>
+        <div class="connection-block">
+          <label class="window-picker">Window
+            <select id="window">
+              <option value="24h">24 hours</option>
+              <option value="7d" selected>7 days</option>
+              <option value="30d">30 days</option>
+              <option value="all">All time</option>
+            </select>
+          </label>
+          <span id="connection" class="connection"><i></i>Connecting</span>
+          <span id="last-refresh" class="muted small">not refreshed yet</span>
+          <button id="refresh-all" class="icon-button" aria-label="Refresh now" title="Refresh now">↻</button>
+        </div>
+      </header>
+      <div id="connection-alert" class="connection-alert" role="alert" hidden></div>
+      <main id="main" tabindex="-1">
+
+        <section id="view-overview" class="view">
+          <div class="page-heading"><div><div class="eyebrow">AGENTS / HABITS</div><h1>What your agents keep getting wrong.</h1><p>Warnings from every agent and repo on this machine, read from the agent-guard event log.</p></div></div>
+          <div id="overview-alerts"></div>
+          <section class="panel"><div id="overview-stats" class="stat-row"></div></section>
+          <div class="overview-grid">
+            <section class="panel"><div class="panel-heading"><div><h2>Warnings over time</h2><p id="series-note" class="muted small"></p></div><div class="legend"><span class="key hard"></span>hard<span class="key soft"></span>soft</div></div><div id="series" class="series"></div><div id="series-axis" class="series-axis"></div></section>
+            <section class="panel"><div class="panel-heading"><h2>Top rules</h2><button class="text-button" data-go="rules">All rules →</button></div><div id="top-rules" class="rank-list"></div></section>
+          </div>
+          <div class="overview-grid even">
+            <section class="panel"><div class="panel-heading"><h2>By agent</h2><button class="text-button" data-go="health">Agents →</button></div><div id="top-agents" class="rank-list"></div></section>
+            <section class="panel"><div class="panel-heading"><h2>By repo</h2><button class="text-button" data-go="activity">Activity →</button></div><div id="top-repos" class="rank-list"></div></section>
+          </div>
+          <section class="panel"><div class="panel-heading"><div><h2>Habits</h2><p class="muted small">The same agent breaking the same rule again and again. Correct it once and let the agent propose a rule.</p></div></div><div id="habits" class="rank-list"></div></section>
+          <section class="panel"><div class="panel-heading"><div><h2>Latest events</h2><p class="muted small">Newest first, every kind of event</p></div><button class="text-button" data-go="activity">Full activity →</button></div><div id="recent"></div></section>
+          <div class="scope-note"><span aria-hidden="true">ⓘ</span><p>Counts cover what agent hooks and the global git hooks logged. Agents without hook support are only checked at commit time, and repos with their own <code>core.hooksPath</code> skip the commit checks (see Health).</p></div>
+        </section>
+
+        <section id="view-rules" class="view" hidden>
+          <div class="page-heading"><div><div class="eyebrow">RULEBOOK</div><h1>Rules</h1><p>Approved, proposed and retired rules, with what each one caught in this window.</p></div>
+            <label class="repo-picker">Apply a repo's overlay <select id="rules-repo"><option value="">Global rules only</option></select></label></div>
+          <div id="rules-overlay"></div>
+          <section class="panel filters-panel"><label class="search-field"><span aria-hidden="true">⌕</span><input id="rule-search" type="search" placeholder="Search id, title, why, fix or pattern" aria-label="Search rules"></label><div id="rule-filters" class="filter-grid"></div><div class="filter-summary"><span id="rule-count"></span><button id="clear-filters" class="text-button">Clear filters</button></div></section>
+          <div class="split-layout"><section class="panel list-panel"><div id="rule-list" class="rule-list"></div></section><section id="rule-detail" class="panel detail-panel" aria-label="Rule details"><div class="empty-state"><span class="empty-symbol">≡</span><h2>Pick a rule</h2><p>See why it exists, what to do instead, and what it caught.</p></div></section></div>
+        </section>
+
+        <section id="view-activity" class="view" hidden>
+          <div class="page-heading"><div><div class="eyebrow">EVENT LOG</div><h1>Activity</h1><p>Every logged warning, kept line, session, proposal and error, newest first.</p></div></div>
+          <section class="panel filters-panel"><label class="search-field"><span aria-hidden="true">⌕</span><input id="activity-search" type="search" placeholder="Search any field: path, snippet, session…" aria-label="Search activity"></label><div id="activity-filters" class="filter-grid"></div><div class="filter-summary"><span id="activity-total" aria-live="polite"></span><button id="activity-clear" class="text-button">Clear filters</button></div></section>
+          <div class="split-layout"><section class="panel list-panel"><div id="activity-list"></div><div class="pagination"><button id="activity-prev" class="button" disabled>Newer</button><span id="activity-page" class="muted small"></span><button id="activity-next" class="button" disabled>Older</button></div></section><section id="activity-detail" class="panel detail-panel" aria-label="Event details"><div class="empty-state"><span class="empty-symbol">↳</span><h2>Pick an event</h2><p>See every field that was logged.</p></div></section></div>
+        </section>
+
+        <section id="view-proposals" class="view" hidden>
+          <div class="page-heading"><div><div class="eyebrow">LEARNING LOOP</div><h1>Proposals</h1><p>Rules agents proposed after you corrected them. None of them is active yet.</p></div></div>
+          <p class="notice">Agents propose; only you approve. An approved rule warns every agent in every repo, so approving happens in your own terminal with <code>guard review</code>, where agents can't answer for you. This page shows what you'd be approving.</p>
+          <div id="proposal-list"></div>
+          <section class="panel"><div class="panel-heading"><div><h2>Decided in this window</h2><p class="muted small">From the event log</p></div></div><div id="decided"></div></section>
+        </section>
+
+        <section id="view-check" class="view" hidden>
+          <div class="page-heading"><div><div class="eyebrow">TRY THE RULES</div><h1>Check</h1><p>Run the rules on a repo's changes, a diff, a command or a commit message. Same as <code>guard check</code>; nothing is logged.</p></div></div>
+          <section class="panel context-panel">
+            <form id="check-form">
+              <div class="check-grid">
+                <label>Repo (its <code>.agent-guard.yaml</code> overlay applies)<select id="check-repo"><option value="">No repo: global rules only</option></select></label>
+                <fieldset class="mode-picker"><legend>What to check</legend>
+                  <label><input type="radio" name="check-mode" value="working" checked> Uncommitted changes</label>
+                  <label><input type="radio" name="check-mode" value="staged"> Staged changes</label>
+                  <label><input type="radio" name="check-mode" value="diff"> A unified diff</label>
+                  <label><input type="radio" name="check-mode" value="command"> A shell command</label>
+                  <label><input type="radio" name="check-mode" value="message"> A commit message</label>
+                </fieldset>
+              </div>
+              <div id="check-text-block" hidden><label for="check-text" id="check-text-label">Text</label><textarea id="check-text" class="code-editor" spellcheck="false"></textarea></div>
+              <div class="form-footer"><span id="check-hint" class="muted small">Reads the repo's working tree with git; changes nothing.</span><button class="button primary" type="submit">Run check</button></div>
+            </form>
+          </section>
+          <div id="check-result"></div>
+        </section>
+
+        <section id="view-health" class="view" hidden>
+          <div class="page-heading"><div><div class="eyebrow">WIRING</div><h1>Health</h1><p>What <code>guard doctor</code> sees, plus when each agent last sent a hook event.</p></div><button id="health-refresh" class="button primary">Run doctor again</button></div>
+          <div id="health-stats"></div>
+          <section class="panel"><div class="panel-heading"><div><h2>Agents</h2><p class="muted small">An installed agent with wired hooks but no recent events may not be running them.</p></div></div><div id="agents-table" class="table-wrap"></div></section>
+          <section class="panel"><div class="panel-heading"><div><h2>Doctor</h2><p id="health-checked" class="muted small"></p></div></div><div id="doctor-results"></div></section>
+        </section>
+      </main>
+      <footer class="workspace-footer"><span>agent-guard</span><span>Local and read-only · one rulebook for every agent</span></footer>
+    </div>
+  </div>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>
