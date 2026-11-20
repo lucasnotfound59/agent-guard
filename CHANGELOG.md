@@ -25,6 +25,10 @@
   code, docs or commits, or send them to the web. `skills/deepseek-delegate` no longer hardcodes a home path.
 
 **Fixes**
+- Warnings about secrets and personal details no longer copy the flagged line into the log, agent messages, the
+  commit output or the dashboard; they give the file and line instead (rules can opt in with `check.redact`). The
+  log and its folder are now readable only by you, and older logs are tightened on the next write. The dashboard
+  also hides such lines already stored by older versions.
 - Commits in other projects' test-suite repos (`pytest-of-*` temp folders) no longer reach the log or notifications.
   They were most of all logged warnings. Configurable with `ignore_repos`.
 - Repo discovery (`guard doctor`, the proposal dry-run) stops at `node_modules`, `.worktrees` and each `.git`, and a

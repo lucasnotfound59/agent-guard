@@ -15,6 +15,19 @@ ALLOW_RE = re.compile(r"agent-guard:\s*allow\s+([a-z0-9-]+)(?:\s+(\S.*))?")
 MAX_SNIPPET = 160
 
 
+def sensitive(rule: Rule) -> str | None:
+    """Why this rule's matched lines must not be repeated anywhere (log, agent messages, terminal), or None.
+
+    The log is kept for months and agent messages go to the model provider, so a flagged secret or personal
+    detail would otherwise be copied far beyond the file it was found in. Rules opt in with check.redact.
+    """
+    if rule.id == "no-secrets" or rule.check.get("redact") == "secret":
+        return "it may hold a secret"
+    if rule.check.get("private_terms") or rule.check.get("redact"):
+        return "it may hold personal details"
+    return None
+
+
 @dataclass
 class Finding:
     rule: Rule
@@ -38,6 +51,9 @@ class Finding:
 
     def snippet(self) -> str:
         t = (self.text or "").strip()
+        why = sensitive(self.rule)
+        if why and t:
+            return f"[line hidden: {why}; open {self.where or 'the file'} to see it]"
         return t if len(t) <= MAX_SNIPPET else t[: MAX_SNIPPET - 1] + "…"
 
     def to_event(self) -> dict:

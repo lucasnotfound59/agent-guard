@@ -99,6 +99,9 @@ fix: Use a path relative to the project, an environment variable, or Path.home()
 ```
 
 - **Keep a flagged line on purpose:** add `agent-guard: allow <rule-id> <reason>` on that line. It's logged as kept, with the reason.
+- **Hidden lines:** warnings from `no-secrets`, from rules that use private terms, and from rules with
+  `check.redact: true` (or `redact: secret`) name the file and line but never repeat the line itself: not in the log,
+  not in agent messages, not in the dashboard. The log (`~/.agent-guard/log/`) is readable only by you.
 - **Per-repo overlay:** `.agent-guard.yaml` at a repo root can add `rules:`, `exclude_paths:`, commit-time
   `checks:`, and `disable:` entries. Each disable needs an `id` and a `reason`.
 - **Private terms:** a rule with `check.private_terms: true` also matches every line of

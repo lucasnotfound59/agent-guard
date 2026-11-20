@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from agent_guard import adapters, doctor, events, report, review
-from agent_guard.checks import Finding, check_command, check_commit_message, check_files
+from agent_guard.checks import Finding, check_command, check_commit_message, check_files, sensitive
 from agent_guard.diff import parse_unified, staged, working
 from agent_guard.paths import contract, log_file, repo_root
 from agent_guard.rules import Rule, active_rules, global_rules, validate
@@ -104,8 +104,27 @@ def version(log: LogCache) -> str:
     return hashlib.sha1(repr(parts).encode()).hexdigest()[:16]
 
 
+_SENSITIVE: dict[str, str] = {}
+
+
+def _hidden_rules() -> dict[str, str]:
+    """rule id -> reason, for rules whose matched lines must not be shown (see checks.sensitive)."""
+    if not _SENSITIVE:
+        for status in ("active", "candidate", "retired"):
+            for r in global_rules(status):
+                why = sensitive(r)
+                if why:
+                    _SENSITIVE[r.id] = why
+        _SENSITIVE.setdefault("no-secrets", "it may hold a secret")
+    return _SENSITIVE
+
+
 def _event_item(i: int, rec: dict[str, Any]) -> dict[str, Any]:
-    return {"id": i, **rec, "repoName": report.repo_label(rec.get("repo")) if rec.get("repo") else None}
+    item = {"id": i, **rec, "repoName": report.repo_label(rec.get("repo")) if rec.get("repo") else None}
+    why = _hidden_rules().get(str(rec.get("rule")))
+    if why and item.get("snippet") and not str(item["snippet"]).startswith("[line hidden"):
+        item["snippet"] = f"[line hidden: {why}]"  # logged before agent-guard stopped storing these lines
+    return item
 
 
 def known_repos(log: LogCache, limit: int = 60) -> list[dict[str, Any]]:

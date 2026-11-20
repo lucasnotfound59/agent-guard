@@ -25,18 +25,26 @@ def now_iso() -> str:
 
 
 def log(event: str, **fields: Any) -> None:
-    """Append one JSON line. Logging must never break a hook."""
+    """Append one JSON line to a log only you can read. Logging must never break a hook."""
     try:
         path = log_file()
-        path.parent.mkdir(parents=True, exist_ok=True)
+        path.parent.mkdir(mode=0o700, parents=True, exist_ok=True)
+        _private(path.parent, 0o700)
         if path.exists() and path.stat().st_size > MAX_LOG_BYTES:
             _rotate(path)
         rec = {"ts": now_iso(), "event": event, **{k: v for k, v in fields.items() if v is not None}}
-        with path.open("a", encoding="utf-8") as fh:
+        fd = os.open(path, os.O_WRONLY | os.O_APPEND | os.O_CREAT, 0o600)
+        with os.fdopen(fd, "a", encoding="utf-8") as fh:
             fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
+        _private(path, 0o600)  # logs written by older versions were readable by every user on the Mac
     except Exception:
         # Logging is best effort: a full disk must never break an agent's hook.
         return
+
+
+def _private(path: Path, mode: int) -> None:
+    if path.stat().st_mode & 0o077:
+        os.chmod(path, mode)
 
 
 def _rotate(path: Path) -> None:
