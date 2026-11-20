@@ -1,0 +1,30 @@
+id: no-personal-info
+title: No personal details (your name, username or private e-mail) in code or docs
+severity: hard
+status: candidate
+applies_to:
+- '**'
+exclude:
+- AUTHORS*
+- CONTRIBUTORS*
+- .mailmap
+- CODEOWNERS
+check:
+  kind: added-line-forbidden
+  pattern: (?<![\w.+-])[A-Za-z0-9][A-Za-z0-9._%+-]*@[A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}\b
+  allow_patterns:
+  - '@(?:[\w-]+\.)*(?:example|invalid|test|localhost|local)\b'
+  - \b(?:no-?reply|donotreply|do-not-reply)[\w.+-]*@
+  - '@(?:[\w-]+\.)*noreply\.'
+  - \bgit@
+  private_terms: true
+why: 'Anything committed is published with the repo (GitHub, packages, pastes) and can''t be taken back:
+  your real name, usernames and private e-mail addresses end up public.'
+fix: 'Leave it out or use a placeholder (you@example.com, an environment variable, a config file that
+  isn''t committed). Keep a genuinely public address with `agent-guard: allow no-personal-info <reason>`.
+  Your private terms live in ~/.agent-guard/private-terms.txt.'
+source:
+  proposed_by: claude
+  proposed_at: '2026-11-20'
+  evidence: do not put my personal key/ absolute path/ name/ non-open e-mails/ real name on the web or
+    hardcode it, only allow relative path

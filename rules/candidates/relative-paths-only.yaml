@@ -1,0 +1,23 @@
+id: relative-paths-only
+title: Use relative paths, not machine-specific absolute ones
+severity: hard
+status: candidate
+applies_to:
+- '**'
+check:
+  kind: added-line-forbidden
+  patterns:
+  - (?<![\w.-])/(?:private/)?var/folders/
+  - (?<![\w.-])/private/(?:tmp|var)/
+  - (?<![\w.-])/Volumes/[^/\s"'<>]+/
+  - \b[A-Za-z]:[\\/]+(?:Users|Documents and Settings)[\\/]+[^\\/\s"'<>]+
+  - (?<![\w.-])/mnt/[a-z]/Users/
+why: These paths (macOS temp folders, /private, mounted volumes, Windows and WSL user folders) only exist
+  on one machine, so the code breaks everywhere else and the path leaks how it is set up.
+fix: Use a path relative to the project, an environment variable, tempfile.gettempdir() / os.tmpdir(),
+  or Path.home().
+source:
+  proposed_by: claude
+  proposed_at: '2026-11-20'
+  evidence: do not put my personal key/ absolute path/ name/ non-open e-mails/ real name on the web or
+    hardcode it, only allow relative path

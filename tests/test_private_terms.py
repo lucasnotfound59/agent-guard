@@ -1,4 +1,5 @@
-"""Private terms: the user's name, usernames and private e-mails, kept outside the repo."""
+"""Private terms (the user's name, usernames and private e-mails kept outside the repo) and the two rules
+proposed for personal details and machine-specific paths."""
 
 import shutil
 
@@ -115,3 +116,54 @@ def test_doctor_reports_missing_and_readable_private_terms(reg):
     [(level, msg)] = doctor._private_terms_status(active)
     assert level == "ok" and "1 terms" in msg
     assert doctor._private_terms_status([r for r in active if not r.check.get("private_terms")]) == []
+
+
+# ------------------------------------------------------------------ the proposed rules
+
+
+def proposed(rule_id: str) -> Rule:
+    """The rule as proposed, or as approved once the user moves it to rules/active."""
+    return next(r for s in ("candidate", "active") for r in global_rules(s) if r.id == rule_id)
+
+
+@pytest.mark.parametrize("line,hit", [
+    ('CONTACT = "jane.doe@gmail.com"', True),
+    ("mail me: someone@school.edu.cn", True),
+    ('url = "https://user:pw@internal.corp.io/x"', True),
+    ('EMAIL = "you@example.com"', False),
+    ("Co-Authored-By: Claude <noreply@anthropic.com>", False),
+    ("12345+someone@users.noreply.github.com", False),
+    ("git clone git@github.com:owner/repo.git", False),
+    ("y = a @ b.reshape(3)", False),
+    ("npm i react@18.3.1", False),
+])
+def test_no_personal_info_emails(line, hit):
+    rule = proposed("no-personal-info")
+    assert not validate(rule)
+    assert flagged(rule, line) is hit
+    assert not flagged(rule, "jane@gmail.com", path="AUTHORS.md")  # contributor lists are public on purpose
+
+
+def test_no_personal_info_uses_private_terms():
+    terms("Jane Doe")
+    assert flagged(proposed("no-personal-info"), "# written by jane_doe")
+
+
+@pytest.mark.parametrize("line,hit", [
+    ('p = "/private/var/folders/y8/abc/T/x"', True),
+    ('p = "/var/folders/y8/abc/T/x"', True),
+    ("cd /private/tmp/build", True),
+    ('OUT = "/Volumes/Backup/photos"', True),
+    (r'path = "C:\\Users\\jane\\file.txt"', True),
+    ("path = 'C:/Users/jane/file.txt'", True),
+    ("ls /mnt/c/Users/jane", True),
+    ("#!/usr/bin/env python3", False),
+    ("cmd > /dev/null 2>&1", False),
+    ('route = "/api/overview"', False),
+    ('p = "/tmp/build.log"', False),
+    ("data/var/folders/x", False),
+])
+def test_relative_paths_only(line, hit):
+    rule = proposed("relative-paths-only")
+    assert not validate(rule)
+    assert flagged(rule, line) is hit
