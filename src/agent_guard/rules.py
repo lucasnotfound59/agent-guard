@@ -61,13 +61,17 @@ def _glob_re(pattern: str) -> re.Pattern[str]:
 
 
 def path_matches(path: str, patterns: list[str]) -> bool:
-    """Patterns without a slash match the file name anywhere (like .gitignore)."""
+    """Like .gitignore: a pattern without a slash matches the file name anywhere, and a leading slash anchors a
+    pattern to the repo root (`/*.py` is a .py file at the top level, not one in src/)."""
     p = path.replace("\\", "/")
     while p.startswith("./"):
         p = p[2:]
     name = PurePosixPath(p).name
     for pat in patterns or []:
-        target = p if "/" in pat else name
+        if pat.startswith("/"):
+            pat, target = pat[1:], p
+        else:
+            target = p if "/" in pat else name
         if _glob_re(pat).match(target):
             return True
     return False

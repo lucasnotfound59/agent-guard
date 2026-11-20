@@ -103,7 +103,7 @@ def _cmd_propose(a: argparse.Namespace) -> int:
     ok, msg = review.propose(id=a.id, title=a.title, kind=a.kind, patterns=a.pattern or [], severity=a.severity,
                              why=a.why, fix=a.fix, evidence=a.evidence, agent=a.agent, applies_to=a.applies_to,
                              exclude=a.exclude, paths=a.paths, allow_patterns=a.allow_pattern,
-                             private_terms=a.private_terms)
+                             private_terms=a.private_terms, allow_paths=a.allow_paths)
     print(msg)
     return 0 if ok else 1
 
@@ -247,7 +247,8 @@ def build_parser() -> argparse.ArgumentParser:
     s.add_argument("--allow-pattern", action="append", help="regex for lines that are fine after all (repeatable)")
     s.add_argument("--private-terms", action="store_true",
                    help="also match the user's private terms (~/.agent-guard/private-terms.txt, never committed)")
-    s.add_argument("--paths", nargs="+", help="globs for path-forbidden")
+    s.add_argument("--paths", nargs="+", help="globs for path-forbidden (a leading / anchors to the repo root)")
+    s.add_argument("--allow-paths", nargs="+", help="globs that path-forbidden lets through")
     s.add_argument("--applies-to", nargs="+", help="globs, e.g. '*.ts' 'src/**'")
     s.add_argument("--exclude", nargs="+")
     s.add_argument("--severity", default="soft", choices=["soft", "hard"])

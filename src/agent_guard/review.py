@@ -34,7 +34,7 @@ def _dump(rule: Rule) -> str:
 def propose(*, id: str, title: str, kind: str, patterns: list[str], severity: str, why: str, fix: str,
             evidence: str, agent: str, applies_to: list[str] | None = None, exclude: list[str] | None = None,
             paths: list[str] | None = None, allow_patterns: list[str] | None = None,
-            private_terms: bool = False) -> tuple[bool, str]:
+            private_terms: bool = False, allow_paths: list[str] | None = None) -> tuple[bool, str]:
     existing = {r.id for s in ("active", "candidate", "retired") for r in global_rules(s)}
     if id in existing:
         return False, f"a rule with id {id!r} already exists; pick another id or ask the user to edit it"
@@ -47,6 +47,8 @@ def propose(*, id: str, title: str, kind: str, patterns: list[str], severity: st
         check["patterns"] = patterns
     if allow_patterns and kind != "path-forbidden":
         check["allow_patterns"] = allow_patterns
+    if allow_paths and kind == "path-forbidden":
+        check["allow"] = allow_paths
     if private_terms:
         check["private_terms"] = True
     rule = Rule(id=id, title=title, severity=severity, status="candidate", check=check, why=why, fix=fix,
