@@ -11,7 +11,8 @@ conflicts with these rules, follow the repository for that project, but never we
   against shared rules. It is warn-only: nothing is blocked, but every warning is logged and shown to the user.
 - When you get an agent-guard warning, fix it in the same turn, or tell the user plainly why it should stay.
   To keep a flagged line on purpose, put `agent-guard: allow <rule-id> <reason>` on that line.
-- `guard rules` lists the rules for the current repo. Run `guard check` before you say you are done.
+- `guard rules` lists the rules for the current repo. After changing code, run `guard check` before you say you
+  are done.
 - Never bypass or disable checks: no `--no-verify`, `HUSKY=0`, or changes to `core.hooksPath`; don't edit
   `~/.agent-guard`, agent hook configs, or the agent-guard rules.
 
@@ -26,6 +27,9 @@ conflicts with these rules, follow the repository for that project, but never we
 
 ## How to work
 
+- Match the process to the task. Simple tasks (a question, a status check, one command, a push or pull, a
+  one-line or docs-only change) need no plan, test run, `guard check` or extra verification: do it and report.
+  The steps below are for code changes.
 - Read before you edit: the repo's instructions, its README, and the code you are changing.
 - Keep changes scoped to the task. No drive-by refactors, renames, or reformatting of unrelated code.
 - Prefer existing tools, libraries and project scripts over writing new ones.
