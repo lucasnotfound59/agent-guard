@@ -45,7 +45,7 @@ you edited since. `guard uninstall --purge` also deletes the runtime, logs and b
 | Command | What it does |
 | --- | --- |
 | `guard dashboard` | Local web dashboard: warnings over time, habits, rules and what each caught, the full event log, proposals with a dry-run, a rule tester, doctor, and a Toolbox for every agent's skills, MCP servers, plugins and AGENTS.md (`--read-only` turns changes off) |
-| `guard report --since 7d` | Which rules each agent breaks most, across all repos (`--since all`, `--json` for scripts). This is how you spot bad habits |
+| `guard report --since 7d` | Which rules each agent breaks most, across all repos, and how many files and commands were checked (`--since all`, `--json` for scripts). This is how you spot bad habits |
 | `guard review` | Approve, edit or reject rules that agents proposed (needs a terminal, so agents can't approve their own) |
 | `guard scan <repo>` | Bad patterns already in a repo that agents will copy |
 | `guard rules` | Rules that apply in the current repo |

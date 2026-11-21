@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Clean work is now visible: each agent session logs a `checked` record at the end of a turn (or every 10 minutes
+  for agents without a stop hook) with how many files and commands were checked and how many warnings came up. No
+  content is stored. Without it, a week with no warnings couldn't be told apart from hooks that never ran.
+- `guard report` and the dashboard show files and commands checked, and count new sessions separately from resumed
+  ones. The dashboard's latest-events list leaves out `checked` records; Activity shows them.
+
 ## 1.1.0 — 2026-11-20
 
 **Dashboard**

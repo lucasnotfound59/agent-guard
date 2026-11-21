@@ -191,7 +191,8 @@ def overview(log: LogCache, window: str) -> dict[str, Any]:
             counts[key] += 1
             if validate(r):
                 counts["invalid"] += 1
-    recent = [_event_item(i, r) for i, _, r in reversed(recs[-12:])]
+    # `checked` records come once per turn; they'd push everything else out of the latest-events list.
+    recent = [_event_item(i, r) for i, _, r in reversed(recs) if r.get("event") != "checked"][:12]
     return {
         "window": window,
         "logPath": contract(log_file()),
@@ -361,6 +362,7 @@ def health(log: LogCache, cache: HealthCache, window: str, force: bool = False) 
     results, at = cache.results(force)
     last: dict[str, float] = {}
     sessions: Counter = Counter()
+    checked: Counter = Counter()
     warnings: Counter = Counter()
     for t, rec in log.records():
         agent = rec.get("agent")
@@ -373,6 +375,8 @@ def health(log: LogCache, cache: HealthCache, window: str, force: bool = False) 
             sessions[agent] += 1
         elif rec.get("event") == "finding":
             warnings[agent] += 1
+        elif rec.get("event") == "checked":
+            checked[agent] += report._int(rec.get("files")) + report._int(rec.get("commands"))
     rows = []
     listed = set()
     for a in adapters.load_all():
@@ -381,10 +385,11 @@ def health(log: LogCache, cache: HealthCache, window: str, force: bool = False) 
         rows.append({"name": a.name, "title": a.title, "installed": a.detected(),
                      "hooks": "none" if a.hooks_writer == "none" else ("wired" if present else
                                                                         "missing" if present is False else "n/a"),
-                     "last": last.get(a.name), "sessions": sessions[a.name], "warnings": warnings[a.name]})
+                     "last": last.get(a.name), "sessions": sessions[a.name], "warnings": warnings[a.name],
+                     "checked": checked[a.name]})
     for name in sorted(set(last) - listed):  # e.g. human-or-unknown (commits made outside any agent)
         rows.append({"name": name, "title": name, "installed": None, "hooks": "n/a", "last": last[name],
-                     "sessions": sessions[name], "warnings": warnings[name]})
+                     "sessions": sessions[name], "warnings": warnings[name], "checked": checked[name]})
     return {"window": window, "checkedAt": at, "results": [{"level": lvl, "message": m} for lvl, m in results],
             "agents": rows}
 

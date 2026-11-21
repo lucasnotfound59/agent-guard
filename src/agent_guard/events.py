@@ -121,6 +121,21 @@ class SessionState:
         safe = "".join(c if c.isalnum() or c in "-_" else "_" for c in (session_id or "nosession"))[:80]
         self.path = session_state_dir() / f"{agent}-{safe}.json"
         self.data: dict[str, Any] = _read_state(self.path)
+        self._counts: dict[str, int] = {}
+        self._flush: dict[str, Any] | None = None
+
+    def count(self, key: str, n: int = 1) -> None:
+        """Add to this session's activity counters (files and commands checked, warnings)."""
+        if n:
+            self._counts[key] = self._counts.get(key, 0) + n
+
+    def flush_checked(self, **fields: Any) -> None:
+        """On save, log the counters as one `checked` record (if anything was checked) and start over.
+
+        Warnings alone can't tell "every edit was clean" from "the hooks never ran"; these records can, without
+        logging any content.
+        """
+        self._flush = fields
 
     def is_new(self, key: str) -> bool:
         return key not in self.data["seen"]
@@ -154,12 +169,23 @@ class SessionState:
                     lst = touched.setdefault(root, [])
                     lst += [r for r in rels if r not in lst]
                 merged = {**disk, **self.data, "seen": seen[-2000:], "touched": touched}
-                if isinstance(disk.get("last_ts"), (int, float)) and isinstance(self.data.get("last_ts"), (int, float)):
-                    merged["last_ts"] = max(disk["last_ts"], self.data["last_ts"])
+                for key in ("last_ts", "flushed_at"):
+                    if isinstance(disk.get(key), (int, float)) and isinstance(self.data.get(key), (int, float)):
+                        merged[key] = max(disk[key], self.data[key])
+                activity = {k: int(v) for k, v in (disk.get("activity") or {}).items() if isinstance(v, (int, float))}
+                for k, n in self._counts.items():
+                    activity[k] = activity.get(k, 0) + n
+                if self._flush is not None:
+                    if any(activity.values()):
+                        log("checked", **self._flush, **dict(sorted(activity.items())))
+                    activity = {}
+                    merged["flushed_at"] = time.time()
+                merged["activity"] = activity
                 tmp = self.path.with_name(f".{self.path.name}.{os.getpid()}.tmp")
                 tmp.write_text(json.dumps(merged), encoding="utf-8")
                 os.replace(tmp, self.path)
                 self.data = merged
+                self._counts, self._flush = {}, None
             _prune(self.path.parent)
         except OSError:
             pass

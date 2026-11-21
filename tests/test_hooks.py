@@ -149,3 +149,39 @@ def test_resume_repeats_the_rules_when_it_has_no_record_or_they_changed(repo):
     changed = _start("claude", "claude", repo, "s-change", "resume")
     assert "Hard:" in changed and "Disabled here: no-ts-any" in changed
     assert "Hard:" in _start("claude", "claude", repo, "s-change", "compact")  # context was summarised
+
+
+def _post_edit(repo, session, path, text):
+    payload = {"hook_event_name": "PostToolUse", "session_id": session, "cwd": str(repo), "tool_name": "Write",
+               "tool_input": {"file_path": path, "content": text}}
+    hooks.run("claude", "claude", "auto", json.dumps(payload))
+
+
+def _stop_hook(repo, session):
+    hooks.run("claude", "claude", "stop", json.dumps({"hook_event_name": "Stop", "session_id": session,
+                                                      "cwd": str(repo)}))
+
+
+def test_clean_work_is_recorded_without_content(repo):
+    (repo / "ok.py").write_text("x = 1\n")
+    _post_edit(repo, "c1", str(repo / "ok.py"), "x = 1\n")
+    _post_edit(repo, "c1", _write_bad(repo), BAD_LINE)
+    _stop_hook(repo, "c1")
+    checked = [r for r in read_log() if r["event"] == "checked"]
+    assert len(checked) == 1
+    assert (checked[0]["files"], checked[0]["warnings"], checked[0]["agent"]) == (2, 1, "claude")
+    assert "x = 1" not in json.dumps(checked[0])
+    _stop_hook(repo, "c1")  # nothing new since: no second record
+    assert len([r for r in read_log() if r["event"] == "checked"]) == 1
+
+
+def test_agents_without_a_stop_hook_flush_every_ten_minutes(repo, monkeypatch):
+    payload = {"hook_event_name": "PostToolUse", "session_id": "cp1", "cwd": str(repo), "tool_name": "bash",
+               "tool_input": {"command": "ls"}}
+    hooks.run("copilot", "copilot", "post_command", json.dumps(payload))
+    assert not [r for r in read_log() if r["event"] == "checked"]
+    real = hooks.time.time
+    monkeypatch.setattr(hooks.time, "time", lambda: real() + hooks.FLUSH_SECONDS + 5)
+    hooks.run("copilot", "copilot", "post_command", json.dumps(payload))
+    checked = [r for r in read_log() if r["event"] == "checked"]
+    assert len(checked) == 1 and checked[0]["commands"] == 2 and checked[0]["agent"] == "copilot"

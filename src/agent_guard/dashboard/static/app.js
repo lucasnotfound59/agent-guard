@@ -47,7 +47,7 @@
     finding: 'Warning', suppressed: 'Kept on purpose', session_start: 'Session started', stop_summary: 'Unresolved at turn end',
     proposal: 'Rule proposed', approved: 'Rule approved', rejected: 'Rule rejected', hook_error: 'Hook error',
     git_hook_error: 'Git hook error', doctor: 'Doctor issues', doctor_error: 'Doctor error', project_check: 'Project check failed',
-    toolbox: 'Toolbox change'
+    toolbox: 'Toolbox change', checked: 'Checked'
   };
   const TOOLBOX_ACTIONS = {
     'mcp.add': 'Added MCP server', 'mcp.copy': 'Copied MCP server', 'mcp.remove': 'Removed MCP server',
@@ -74,7 +74,8 @@
   const eventTitle = rec => {
     switch (rec.event) {
       case 'finding': case 'suppressed': case 'proposal': case 'approved': case 'rejected': return rec.rule || '—';
-      case 'session_start': return (rec.agent || '?') + ' session' + (rec.repoName ? ' in ' + rec.repoName : '');
+      case 'session_start': return (rec.agent || '?') + (rec.source === 'resume' ? ' session resumed' : ' session') + (rec.repoName ? ' in ' + rec.repoName : '');
+      case 'checked': return (rec.files || 0) + ' file(s), ' + (rec.commands || 0) + ' command(s) checked' + (rec.warnings ? ' · ' + rec.warnings + ' warning(s)' : ', all clean');
       case 'stop_summary': return (rec.outstanding || 0) + ' unresolved: ' + list(rec.rules).join(', ');
       case 'doctor': return list(rec.issues)[0] || 'doctor issues';
       case 'project_check': return String(rec.detail || '').trim().split('\n')[0];
@@ -290,7 +291,10 @@
     const stat = (value, label, tone) => append(el('div', 'stat'), el('div', 'stat-value ' + (value && tone ? tone : ''), fmtNum(value)), el('span', 'stat-label', label));
     fill($('overview-stats'),
       stat(s.warnings, 'Warnings'), stat(s.hard, 'Hard (almost always wrong)', 'danger'), stat(s.kept, 'Kept on purpose'),
-      stat(s.sessions, 'Agent sessions'), stat(s.unresolved_at_stop, 'Turns ended with warnings left', 'warning'));
+      s.checked_records ? stat(s.checked_files + s.checked_commands, 'Files and commands checked')
+        : append(el('div', 'stat'), el('div', 'stat-value', '—'), el('span', 'stat-label', 'Files and commands checked (none recorded yet)')),
+      stat(s.sessions, 'New agent sessions' + (s.resumed ? ' (+' + s.resumed + ' resumed)' : '')),
+      stat(s.unresolved_at_stop, 'Turns ended with warnings left', 'warning'));
 
     const rows = d.series.rows;
     const highest = Math.max(0, ...rows.map(r => r.hard + r.soft));
@@ -643,7 +647,7 @@
     fill($('health-stats'), append(el('div', 'chip-row'), chip('fail', 'failing'), chip('warn', 'warnings'), chip('ok', 'ok'), chip('info', 'notes')));
     $('health-checked').textContent = 'Checked ' + ago(d.checkedAt) + ' (' + fmtTime(d.checkedAt) + ')';
     const table = el('table');
-    const thead = append(el('thead'), append(el('tr'), ['Agent', 'Installed', 'Hooks', 'Last event', 'Sessions', 'Warnings'].map(h => el('th', '', h))));
+    const thead = append(el('thead'), append(el('tr'), ['Agent', 'Installed', 'Hooks', 'Last event', 'Sessions', 'Checked', 'Warnings'].map(h => el('th', '', h))));
     const tbody = el('tbody');
     list(d.agents).forEach(a => {
       const hooks = {wired: badge('wired', 'success'), missing: badge('missing', 'danger'), none: badge('no hook support', 'outline'), 'n/a': badge('—', 'outline')}[a.hooks] || badge(a.hooks, 'outline');
@@ -652,7 +656,7 @@
       else if (a.installed && a.hooks === 'wired') lastCell.append(' ', badge('check its hooks run', 'warning'));
       append(tbody, append(el('tr'), append(el('td'), el('strong', '', a.title), a.title !== a.name ? el('div', 'muted small mono', a.name) : null),
         el('td', '', a.installed === null ? '—' : a.installed ? 'yes' : 'no'), append(el('td'), hooks), lastCell,
-        el('td', 'num', fmtNum(a.sessions)), el('td', 'num', fmtNum(a.warnings))));
+        el('td', 'num', fmtNum(a.sessions)), el('td', 'num', fmtNum(a.checked)), el('td', 'num', fmtNum(a.warnings))));
     });
     fill($('agents-table'), append(table, thead, tbody));
     const groups = [['fail', 'Failing', '✗'], ['warn', 'Warnings', '!'], ['ok', 'OK', '✓'], ['info', 'Notes', '·']];

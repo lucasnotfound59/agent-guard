@@ -195,3 +195,14 @@ def test_check_working_tree_uses_the_repo(reg, repo):
 def test_dry_run_refuses_unknown_rules(reg):
     with pytest.raises(data.BadRequest):
         data.dry_run("does-not-exist")
+
+
+def test_checked_records_count_but_stay_out_of_latest_events(reg):
+    events.log("finding", agent="codex", rule="no-ts-any", severity="soft", repo="/w/app", kind="edit")
+    for _ in range(15):
+        events.log("checked", agent="codex", files=1, commands=1, warnings=0)
+    d = data.overview(data.LogCache(), "24h")
+    assert d["summary"]["checked_files"] == 15 and d["summary"]["checked_commands"] == 15
+    assert [r["event"] for r in d["recent"]] == ["finding"]
+    rows = {r["name"]: r for r in data.health(data.LogCache(), data.HealthCache(), "24h")["agents"]}
+    assert rows["codex"]["checked"] == 30

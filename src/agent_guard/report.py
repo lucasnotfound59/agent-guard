@@ -53,7 +53,11 @@ def summary(recs: list[dict]) -> dict:
         "hard": sum(1 for r in finds if r.get("severity") == "hard"),
         "soft": sum(1 for r in finds if r.get("severity") == "soft"),
         "kept": sum(1 for r in recs if r.get("event") == "suppressed"),
-        "sessions": sum(1 for r in recs if r.get("event") == "session_start"),
+        "sessions": sum(1 for r in recs if r.get("event") == "session_start" and r.get("source") != "resume"),
+        "resumed": sum(1 for r in recs if r.get("event") == "session_start" and r.get("source") == "resume"),
+        "checked_records": sum(1 for r in recs if r.get("event") == "checked"),
+        "checked_files": sum(_int(r.get("files")) for r in recs if r.get("event") == "checked"),
+        "checked_commands": sum(_int(r.get("commands")) for r in recs if r.get("event") == "checked"),
         "unresolved_at_stop": sum(1 for r in recs if r.get("event") == "stop_summary"),
         "proposals": sum(1 for r in recs if r.get("event") == "proposal"),
         "project_check_failures": sum(1 for r in recs if r.get("event") == "project_check"),
@@ -69,14 +73,23 @@ def summary(recs: list[dict]) -> dict:
     }
 
 
+def _int(v: object) -> int:
+    return v if isinstance(v, int) else 0
+
+
 def report(since: str = "7d", as_json: bool = False) -> str:
     s = summary(events.read_log(parse_since(since)))
     if as_json:
         return json.dumps({"since": since, **s}, indent=2, ensure_ascii=False)
     window = "all time" if since.strip() == "all" else f"last {since}"
     out = [f"agent-guard report — {window}: {s['warnings']} warning(s) across every agent and repo"]
+    sessions = f"{s['sessions']} new session(s) and {s['resumed']} resumed one(s)"
+    if s["checked_records"]:
+        out.append(f"Checked {s['checked_files']} file(s) and {s['checked_commands']} command(s) in {sessions}.")
+    else:  # older versions logged warnings only, so a window from before has no counts at all
+        out.append(f"{sessions[0].upper()}{sessions[1:]}; no check counts recorded in this window.")
     if not s["warnings"]:
-        out.append("Nothing flagged. (Sessions started: %d)" % s["sessions"])
+        out.append("Nothing flagged.")
         return "\n".join(out)
 
     def table(title: str, rows: list[tuple[str, int]], n: int = 10) -> None:

@@ -17,6 +17,8 @@ from agent_guard.rules import ProjectConfig, Rule, active_rules, find_repo_root
 
 # Formats that also get a pre-command hook, so the user already saw command warnings.
 HAS_PRE_COMMAND = {"claude", "codex", "gemini"}
+# Activity counters reach the log at a turn's end, at session start, or after this long (Copilot has no stop hook).
+FLUSH_SECONDS = 600
 
 
 def run(agent: str, fmt: str, event_hint: str, stdin_text: str) -> str:
@@ -47,6 +49,7 @@ class _Ctx:
         return self._rules[key]
 
     def record(self, findings: list[Finding], kind: str, root: Path | None) -> None:
+        self.state.count("warnings", sum(1 for f in findings if not f.suppressed))
         for f in findings:
             events.log("suppressed" if f.suppressed else "finding", agent=self.agent, kind=kind,
                        repo=str(root) if root else None, cwd=self.cwd, session=self.inp.session_id or None,
@@ -80,7 +83,13 @@ def handle(agent: str, fmt: str, inp: HookInput) -> HookOutput:
             "stop": _stop,
         }[inp.event](ctx)
     finally:
-        ctx.state.data["last_ts"] = time.time()
+        now = time.time()
+        ctx.state.data["last_ts"] = now
+        flushed = float(ctx.state.data.get("flushed_at") or 0) or now
+        if inp.event in ("stop", "session_start") or now - flushed > FLUSH_SECONDS:
+            ctx.state.flush_checked(agent=agent, session=inp.session_id or None, cwd=ctx.cwd)
+        elif "flushed_at" not in ctx.state.data:
+            ctx.state.data["flushed_at"] = now
         ctx.state.save()
 
 
@@ -117,6 +126,8 @@ def _pre_command(ctx: _Ctx) -> HookOutput:
 def _post_command(ctx: _Ctx) -> HookOutput:
     rules, project = ctx.rules_for(ctx.cwd)
     cmd_findings = check_command(rules, ctx.inp.command or "")
+    if ctx.inp.command:
+        ctx.state.count("commands")
     if ctx.fmt not in HAS_PRE_COMMAND:
         ctx.record(cmd_findings, "command", project.root)
     new_cmd = ctx.fresh(cmd_findings, channel="a")
@@ -130,6 +141,7 @@ def _post_command(ctx: _Ctx) -> HookOutput:
             for p in recent:
                 ctx.state.touch(str(root), p)
             if recent:
+                ctx.state.count("files", len(recent))
                 file_findings = check_files(rules, working(root, recent), project.exclude_paths, include_size=False)
                 ctx.record(file_findings, "edit", root)
     new_files = ctx.fresh(file_findings)
@@ -164,6 +176,7 @@ def _post_edit(ctx: _Ctx) -> HookOutput:
             roots.append(root)
         else:
             diffs = [from_text(orig, ctx.inp.edits[orig]) for orig, _ in items if orig in ctx.inp.edits]
+        ctx.state.count("files", len(diffs))
         findings = check_files(rules, diffs, project.exclude_paths, include_size=False)
         ctx.record(findings, "edit", root)
         all_new += ctx.fresh(findings)

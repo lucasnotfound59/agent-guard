@@ -146,3 +146,27 @@ def test_scan_repos_prunes_and_keeps_partial_results_on_timeout(isolated, tmp_pa
     monkeypatch.setattr(config.subprocess, "run", slow)
     repos, timed_out = config.scan_repos()
     assert [p.name for p in repos] == ["a"] and timed_out == ["~/Documents"]
+
+
+def test_parallel_hooks_keep_each_others_counts():
+    a = events.SessionState("claude", "n1")
+    b = events.SessionState("claude", "n1")
+    a.count("files", 2)
+    a.save()
+    b.count("files", 3)
+    b.count("commands")
+    b.save()
+    c = events.SessionState("claude", "n1")
+    c.flush_checked(agent="claude", session="n1")
+    c.save()
+    rec = [r for r in events.read_log() if r["event"] == "checked"][-1]
+    assert (rec["files"], rec["commands"]) == (5, 1)
+
+
+def test_summary_counts_new_and_resumed_sessions_and_checks():
+    events.log("session_start", agent="codex")
+    events.log("session_start", agent="codex", source="resume")
+    events.log("checked", agent="codex", files=4, commands=2, warnings=0)
+    s = report.summary(events.read_log())
+    assert (s["sessions"], s["resumed"], s["checked_files"], s["checked_commands"]) == (1, 1, 4, 2)
+    assert "Checked 4 file(s) and 2 command(s) in 1 new session(s) and 1 resumed one(s)." in report.report("1d")
