@@ -147,8 +147,15 @@ def test_dry_run_changes_nothing(isolated):
     assert snapshot(home) == before
 
 
-def test_settings_that_are_not_plain_json_are_left_alone(isolated):
+def test_settings_that_are_not_plain_json_are_left_alone(isolated, monkeypatch):
     home = isolated
+    # The installer detects Gemini via its executable on PATH.
+    bin_dir = home / "bin"
+    bin_dir.mkdir()
+    gemini = bin_dir / "gemini"
+    gemini.write_text("#!/bin/sh\nexit 0\n")
+    gemini.chmod(0o755)
+    monkeypatch.setenv("PATH", str(bin_dir), prepend=os.pathsep)
     (home / ".gemini").mkdir()
     jsonc = '// my settings\n{"theme": "dark"}\n'
     (home / ".gemini/settings.json").write_text(jsonc)
