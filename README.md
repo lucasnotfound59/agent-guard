@@ -40,6 +40,8 @@ are left alone and reported.
 `guard uninstall` puts back everything the first install changed and removes agent-guard's hooks from settings
 you edited since. `guard uninstall --purge` also deletes the runtime, logs and backups.
 
+Already use Magpie? [Set up agent-guard through Magpie's Hooks Library](docs/magpie-hooks.md).
+
 ## Daily use
 
 | Command | What it does |
