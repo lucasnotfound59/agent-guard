@@ -2,11 +2,36 @@ id: no-ts-any
 title: No new `any` in TypeScript
 severity: soft
 status: active
-applies_to: ['*.ts', '*.tsx', '*.mts', '*.cts']
-exclude: ['*.d.ts']
+applies_to:
+- '*.ts'
+- '*.tsx'
+- '*.mts'
+- '*.cts'
+exclude:
+- '*.d.ts'
 check:
   kind: added-line-forbidden
-  pattern: ':\s*any\b(?![\w-])|\bas\s+any\b|<any>|\bany\[\]'
+  patterns:
+  - :\s*any\b(?![\w-])|\bas\s+any\b|<any>|\bany\[\]
+  - \btype\s+[\w$]+(?:\s*<[^<>;\n]+>)?\s*=\s*any(?![\w$])
 why: '`any` turns off type checking for everything it touches; agents copy it until the types mean nothing.'
 fix: Use the real type, `unknown` plus a type guard, or a generic.
-source: { proposed_by: agent-guard starter set, approved_at: 2026-11-20 }
+explain: Also checks the right-hand side of a TypeScript type alias for the standalone any type.
+examples:
+  path: src/types.ts
+  bad:
+  - type Item = any;
+  - export type Result<T> = any;
+  - 'let item: any;'
+  good:
+  - type Item = unknown;
+  - type Item = anything;
+  - type Item = any$Result;
+  - const item = any;
+source:
+  proposed_by: codex
+  proposed_at: '2026-11-25'
+  evidence: The regression report found that a type alias to any produced no warning.
+  revises: no-ts-any
+  approved_at: '2026-11-25'
+  approved_by: user
