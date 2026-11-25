@@ -19,12 +19,26 @@ exclude:
 - '**/cli/**'
 check:
   kind: added-line-forbidden
-  pattern: \bconsole\.log\s*\(
+  pattern: \bconsole\s*(?:\.\s*log|\[\s*(?P<quote>['"`])log(?P=quote)\s*\])\s*\(
 why: Debug logging left in source code is noise in production; Agent chat already has 14 of them.
 fix: Remove it, or use the project's logger at the right level.
+explain: Matches a call to the literal log property of console, using dot access or a quoted bracket key.
+examples:
+  path: src/app.js
+  bad:
+  - console.log(value)
+  - console['log'](value)
+  - console[ "log" ](value)
+  - console[`log`](value)
+  good:
+  - console.warn(value)
+  - console[method](value)
+  - const log = console['log'];
+  - console['logger'](value)
 source:
-  proposed_by: agent-guard starter set
-  proposed_at: 2026-11-20
-  evidence: 14 console.log calls found in Agent chat packages
-  approved_at: '2026-11-21'
+  proposed_by: codex
+  proposed_at: '2026-11-25'
+  evidence: The regression report found that single-quoted and backtick bracket calls produced no warning.
+  revises: no-stray-console-log
+  approved_at: '2026-11-25'
   approved_by: user
