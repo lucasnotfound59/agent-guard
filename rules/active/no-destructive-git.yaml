@@ -2,16 +2,80 @@ id: no-destructive-git
 title: No force-push, hard reset or discarding work
 severity: hard
 status: active
+applies_to:
+- '**'
 check:
   kind: command-forbidden
-  patterns:
-    - '\bgit\s+push\b[^|;&\n]*\s(?:--force(?!-with-lease|-if-includes)\b|-f\b)'
-    - '\bgit\s+reset\s+[^|;&\n]*--hard\b'
-    - '\bgit\s+clean\s+-[a-zA-Z]*(?:f[a-zA-Z]*d|d[a-zA-Z]*f)'
-    - '\bgit\s+checkout\s+(?:--\s+)?\.(?=\s|$)'
-    - '\bgit\s+restore\s+(?:--[a-z]+\s+)*\.(?=\s|$)'
-    - '\bgit\s+stash\s+(?:drop|clear)\b'
-    - '\bgit\s+branch\s+(?:-D|--delete\s+--force)\b'
+  pattern: '(?x)
+
+    (?<![\w.-])git[ \t]+
+
+    # Consume each global option together with its argument.
+
+    (?:
+
+    (?:(?:-[Cc][ \t]+|--(?:git-dir|work-tree|namespace|config-env)(?:=|[ \t]+)|--exec-path=)
+
+    (?:[^\s;&|()<>#''"\\]|\\[^\n]|''[^''\n]*''|"(?:[^"\\\n]|\\[^\n])*")+
+
+    | -[pP] | --(?:paginate|no-pager|bare|no-replace-objects|no-lazy-fetch|no-optional-locks|no-advice|(?:literal|glob|noglob|icase)-pathspecs))
+
+    [ \t]+
+
+    )*
+
+    (?:
+
+    push[ \t]+(?:(?!--[ \t])(?:[^\s;&|()<>#''"\\]|\\[^\n]|''[^''\n]*''|"(?:[^"\\\n]|\\[^\n])*")+[ \t]+)*(?:--force|-f)
+
+    | reset[ \t]+(?:(?!--[ \t])(?:[^\s;&|()<>#''"\\]|\\[^\n]|''[^''\n]*''|"(?:[^"\\\n]|\\[^\n])*")+[ \t]+)*--hard
+
+    | clean[ \t]+-(?=[A-Za-z]*f)(?=[A-Za-z]*d)[A-Za-z]+
+
+    | checkout[ \t]+(?:--[ \t]+)?\.
+
+    | restore[ \t]+(?:--[a-z-]+[ \t]+)*(?:--[ \t]+)?\.
+
+    | stash[ \t]+(?:drop|clear)
+
+    | branch[ \t]+(?:-D|--delete[ \t]+--force|--force[ \t]+--delete)
+
+    )(?=$|[\s;&|()<>]|[''"`]+(?=$|[\s;&|()<>]))'
 why: These rewrite shared history or throw away uncommitted work (often the user's), with no undo.
 fix: Ask the user first. Prefer --force-with-lease, a new commit, or git stash over deleting work.
-source: { proposed_by: agent-guard starter set, approved_at: 2026-11-20 }
+explain: Consumes Git global options and their values before testing the subcommand. Force-with-lease,
+  ordinary branch checkout and read-only commands stay available.
+examples:
+  bad:
+  - git -C . reset --hard
+  - git --git-dir=repo.git reset --hard
+  - git --git-dir=store reset --hard
+  - git --git-dir .git reset --hard
+  - git -C . checkout .
+  - git -C "working tree" -c color.ui=false --no-pager clean -fdx
+  - git --work-tree=. --git-dir=store push --force origin main
+  - git -C repo restore -- .
+  - git -C repo stash drop
+  - git -C repo branch -D topic
+  - sh -c "git -C repo reset --hard"
+  good:
+  - git -C repo status
+  - git -C repo reset --soft HEAD
+  - git -C repo checkout main
+  - git -C repo push --force-with-lease
+  - git push --force-if-includes
+  - git -C "reset --hard" status
+  - git -C repo status; echo reset --hard
+  - git -C repo reset -- --hard
+  - git -C repo log --oneline
+  - 'git -C .
+
+    printf "%s" reset --hard'
+source:
+  proposed_by: codex
+  proposed_at: '2026-11-25'
+  evidence: The regression report found missed hard resets and checkout of the working tree with Git directory
+    options.
+  revises: no-destructive-git
+  approved_at: '2026-11-25'
+  approved_by: user
