@@ -2,9 +2,90 @@ id: no-dangerous-rm
 title: No rm -rf on broad paths
 severity: hard
 status: active
+applies_to:
+- '**'
 check:
   kind: command-forbidden
-  pattern: '\brm\s+(?:-[a-zA-Z]*r[a-zA-Z]*f[a-zA-Z]*|-[a-zA-Z]*f[a-zA-Z]*r[a-zA-Z]*|-r\s+-f|-f\s+-r)\s+(?:--\s+)?["'']?(?:/|~/?|\$HOME/?|\.\./?|\*|/\*|~/\*|\.)["'']?(?=\s|$|;|&|\|)'
+  pattern: '(?x)
+
+    (?<![\w.-])rm[ \t]+
+
+    # Require both flags before operands or the option terminator.
+
+    (?=(?:--?[A-Za-z][A-Za-z-]*[ \t]+)*(?:--recursive|-[A-Za-z]*[rR][A-Za-z]*)[ \t])
+
+    (?=(?:--?[A-Za-z][A-Za-z-]*[ \t]+)*(?:--force|-[A-Za-z]*f[A-Za-z]*)[ \t])
+
+    # Advance by complete shell words, so any operand can be checked.
+
+    (?:(?:[^\s;&|()<>#''"\\]|\\[^\n]|''[^''\n]*''|"(?:[^"\\\n]|\\[^\n])*")+[ \t]+)*
+
+    (?:
+
+    (?:~|\$(?:HOME|\{HOME\})|"\$(?:HOME|\{HOME\})")(?:(?=/)|(?=$|[\s;&|()<>]|[''"`]+(?=$|[\s;&|()<>])))
+    | "\$(?:HOME|\{HOME\})/
+
+    | (?:
+
+    (?P<literal>["'']?)(?:/+|(?:/+)?\.{1,2}(?:/+\.{1,2})*/*)(?P=literal)/*
+
+    | (?P<dir_quote>")?\$(?:PWD|OLDPWD|\{(?:PWD|OLDPWD)\})
+
+    (?(dir_quote)(?:/+\.{1,2})*/*")
+
+    (?:/+\.{1,2})*(?:/+(?:\*+/+)*\.?\*+)?/*
+
+    | (?:/+|(?:\.{1,2}/+)+)?(?:\*+/+)*\.?\*+/*
+
+    )(?=$|[\s;&|()<>]|[''"`]+(?=$|[\s;&|()<>]))
+
+    )'
 why: One typo here deletes your home folder, the repo, or the whole disk.
 fix: Delete the specific paths you mean (rm -r build/), or move things to the Trash.
-source: { proposed_by: agent-guard starter set, approved_at: 2026-11-20 }
+explain: Requires recursive and force options. Warns for root, whole current, parent or previous directories,
+  home-relative targets and broad globs. Named project children are allowed.
+examples:
+  bad:
+  - rm -rf ./
+  - rm -rf ~/Documents
+  - rm -rf ${HOME}/docs
+  - rm -rf "$HOME"/docs
+  - rm --recursive --force /
+  - rm -rf "$PWD"
+  - rm -rf $OLDPWD
+  - rm -Rf "${OLDPWD}/"
+  - rm -r --force -- ./*
+  - rm --force -R build/ ../*
+  - rm -rf /*
+  - rm -rf "${PWD}"/*
+  - rm -rf ./**/*
+  - sh -c 'rm -rf ./'
+  - rm -rf ././
+  - rm -rf ~/
+  - rm -rf "$HOME/Folder With Spaces"
+  - rm -rf "$PWD"/./
+  good:
+  - rm -rf ./tmp
+  - rm -rf ./node_modules
+  - rm --force --recursive build/
+  - rm -r .
+  - rm --force ./
+  - rm -- -rf .
+  - rm -rf build/ && ls ~
+  - 'rm -rf build/ # ~/Documents'
+  - rm -rf '*.tmp'
+  - rm -rf '$PWD'
+  - rm -rf "$PWD/build"
+  - rm -rf ./Documents-preview
+  - rm -rf cache/*.tmp
+  - 'rm -rf build/
+
+    ls /'
+source:
+  proposed_by: codex
+  proposed_at: '2026-11-25'
+  evidence: The regression report found missed directory targets and long options. The user confirmed
+    named project children should stay allowed.
+  revises: no-dangerous-rm
+  approved_at: '2026-11-25'
+  approved_by: user
